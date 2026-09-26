@@ -8,15 +8,14 @@ import android.window.OnBackInvokedDispatcher
 import androidx.activity.compose.BackHandler
 import androidx.annotation.RequiresApi
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.clipRect
-import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.platform.LocalView
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.ui.platform.LocalContext
 
 internal actual fun uptimeMillis(): Long = SystemClock.uptimeMillis()
+
+internal actual fun elapsedRealtimeMillis(): Long = SystemClock.elapsedRealtime()
 
 // RenderEffect, API 31+; `Modifier.blur` is a no-op below it.
 internal actual val renderEffectBlurSupported: Boolean
@@ -96,25 +95,5 @@ private object OverlayBack {
     fun unregister(view: View, callback: Any?) {
         if (callback !is OnBackInvokedCallback) return
         view.findOnBackInvokedDispatcher()?.unregisterOnBackInvokedCallback(callback)
-    }
-}
-
-/**
- * A touch drag is the only thing that can move this platform's drawer, and a
- * drag is also how the list inside it scrolls — so a finger that runs out of
- * list has to take the drawer with it. See [PlayerDrawer].
- */
-internal actual val drawerFollowsListScroll: Boolean get() = true
-
-internal actual fun DrawScope.clipShiftedDown(
-    left: Float,
-    top: Float,
-    right: Float,
-    bottom: Float,
-    dy: Float,
-    block: DrawScope.() -> Unit,
-) {
-    clipRect(left = left, top = top, right = right, bottom = bottom) {
-        translate(top = dy) { block() }
     }
 }

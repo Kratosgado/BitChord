@@ -6,13 +6,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import com.music.bitchord.data.canvas.CanvasArtwork
+import com.music.bitchord.data.lyrics.LyricAlignment
 import com.music.bitchord.data.lyrics.LyricLine
+import com.music.bitchord.data.lyrics.LyricWord
 import com.music.bitchord.data.lyrics.LyricsSource
-import com.music.bitchord.data.lyrics.LyricsTranslation
 import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.settings.AudioQuality
 import com.music.bitchord.data.settings.LastPlayerScreen
-import com.music.bitchord.data.settings.MixBlend
 import com.music.bitchord.data.settings.SmartAnalysis
 import com.music.bitchord.data.settings.TransitionWindow
 import com.music.bitchord.ui.player.AudioOutputDevice
@@ -85,8 +85,7 @@ internal object DesktopPlayerHost : PlayerHost {
     @Composable
     override fun rememberAudioOutputs(): List<AudioOutputDevice> {
         val selected by DesktopAudioDevices.selected.collectAsState()
-        val changes by DesktopAudioDevices.changes.collectAsState()
-        val devices = remember(changes) { DesktopAudioDevices.available() }
+        val devices = remember { DesktopAudioDevices.available() }
         return remember(selected, devices) {
             val ids = listOf(DesktopAudioDevices.SYSTEM_DEFAULT) + devices.map { it.id }
             listed = ids
@@ -122,15 +121,7 @@ internal object DesktopPlayerHost : PlayerHost {
         .stateIn(scope, SharingStarted.Eagerly, OutputFormatUi())
 
     override val party: StateFlow<PartyUi> = DesktopListenTogether.state
-        .map {
-            PartyUi(
-                inParty = it.inParty,
-                controlsLocked = it.controlsLocked,
-                members = it.members,
-                you = it.you,
-                code = it.code,
-            )
-        }
+        .map { PartyUi(inParty = it.inParty, members = it.members, you = it.you, code = it.code) }
         .stateIn(scope, SharingStarted.Eagerly, PartyUi())
 
     override suspend fun translateLyrics(
@@ -138,22 +129,19 @@ internal object DesktopPlayerHost : PlayerHost {
         lines: List<LyricLine>,
         targetLanguageTag: String,
     ): LyricsTranslationResult =
-        when (val result = LyricsTranslation.translate(trackId, lines, targetLanguageTag)) {
-            is LyricsTranslation.Result.Translated -> LyricsTranslationResult.Translated(result.lines)
-            is LyricsTranslation.Result.SameLanguage -> LyricsTranslationResult.SameLanguage(result.language)
-            LyricsTranslation.Result.Unavailable -> LyricsTranslationResult.Unavailable
+        when (val result = DesktopLyricsTranslation.translate(trackId, lines.map { it.toDesktop() }, targetLanguageTag)) {
+            is DesktopLyricsTranslation.Result.Translated ->
+                LyricsTranslationResult.Translated(result.lines.map { it.toShared() })
+            is DesktopLyricsTranslation.Result.SameLanguage -> LyricsTranslationResult.SameLanguage(result.language)
+            DesktopLyricsTranslation.Result.Unavailable -> LyricsTranslationResult.Unavailable
         }
 
+    // The desktop's translation client has no romanization endpoint yet.
     override suspend fun romanizeLyrics(
         trackId: String,
         lines: List<LyricLine>,
         targetLanguageTag: String,
-    ): LyricsRomanizationResult =
-        when (val result = LyricsTranslation.romanize(trackId, lines, targetLanguageTag)) {
-            is LyricsTranslation.RomanizationResult.Romanized -> LyricsRomanizationResult.Romanized(result.lines)
-            LyricsTranslation.RomanizationResult.AlreadyRomanized -> LyricsRomanizationResult.AlreadyRomanized
-            LyricsTranslation.RomanizationResult.Unavailable -> LyricsRomanizationResult.Unavailable
-        }
+    ): LyricsRomanizationResult = LyricsRomanizationResult.Unavailable
 
     /** The newest notice, for the window to show and clear. */
     val messages = MutableStateFlow<String?>(null)
@@ -185,10 +173,7 @@ internal object DesktopPlayerSettings : PlayerSettingsSource {
     override val canvasOverCellular = MutableStateFlow(true)
     override val fullBleedArtwork = MutableStateFlow(false)
     override val hideSongStatus = MutableStateFlow(false)
-    override val showQueueHistory = MutableStateFlow(false)
     override val hideVolumeBar = MutableStateFlow(false)
-    // A desktop window has no status bar to hide.
-    override val hideStatusBar = MutableStateFlow(false)
     override val lastPlayerScreen = MutableStateFlow(
         runCatching { LastPlayerScreen.valueOf(persistence.string(KEY_LAST_SCREEN, "MAIN")) }
             .getOrDefault(LastPlayerScreen.MAIN),
@@ -198,7 +183,7 @@ internal object DesktopPlayerSettings : PlayerSettingsSource {
     override val lyricsOffsetMs = MutableStateFlow(
         persistence.int(KEY_LYRICS_OFFSET, 0).coerceIn(MIN_LYRICS_OFFSET_MS, MAX_LYRICS_OFFSET_MS),
     )
-    override val lyricsSourceOrder = MutableStateFlow<List<LyricsSource>>(LyricsSource.offered)
+    override val lyricsSourceOrder = MutableStateFlow<List<LyricsSource>>(LyricsSource.entries)
 
     // A desktop is never on a metered link as far as this app can tell.
     override val meteredConnection = MutableStateFlow<Boolean?>(false)
@@ -209,8 +194,6 @@ internal object DesktopPlayerSettings : PlayerSettingsSource {
     override val showNerdStats = MutableStateFlow(false)
     override val smartAnalysis = MutableStateFlow(SmartAnalysis())
     override val smartFadeEnabled = MutableStateFlow(false)
-    override val smartMixInProgress = MutableStateFlow(false)
-    override val smartMixBlend = MutableStateFlow<MixBlend?>(null)
     override val smartTransitionWindow = MutableStateFlow<TransitionWindow?>(null)
     override val spotifyCanvasAutoHide = MutableStateFlow(true)
     override val syncedLyrics = MutableStateFlow(true)
@@ -258,6 +241,25 @@ private fun DesktopAudioPipeline.toOutputFormat(): OutputFormatUi {
             (outputSampleRateHz ?: 0) > 48_000,
     )
 }
+
+/** A desktop lyric line in the shared player's terms — the two are field for field. */
+internal fun DesktopLyricLine.toShared(): LyricLine = LyricLine(
+    timeMs = timeMs,
+    text = text,
+    words = words.map { LyricWord(it.startMs, it.endMs, it.text) },
+    sungUntilMs = sungUntilMs,
+    background = background?.toShared(),
+    alignment = if (alignment == DesktopLyricAlignment.End) LyricAlignment.End else LyricAlignment.Start,
+)
+
+internal fun LyricLine.toDesktop(): DesktopLyricLine = DesktopLyricLine(
+    timeMs = timeMs,
+    text = text,
+    words = words.map { DesktopLyricWord(it.startMs, it.endMs, it.text) },
+    sungUntilMs = sungUntilMs,
+    background = background?.toDesktop(),
+    alignment = if (alignment == LyricAlignment.End) DesktopLyricAlignment.End else DesktopLyricAlignment.Start,
+)
 
 /** The shared provider a desktop source name refers to, matched on its label. */
 internal fun lyricsSourceNamed(name: String): LyricsSource? =

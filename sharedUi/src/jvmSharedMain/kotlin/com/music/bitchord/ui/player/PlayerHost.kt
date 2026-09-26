@@ -12,10 +12,8 @@ import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.settings.AudioQuality
 import com.music.bitchord.data.settings.LastPlayerScreen
 import com.music.bitchord.data.settings.SmartAnalysis
-import com.music.bitchord.data.settings.MixBlend
 import com.music.bitchord.data.settings.TransitionWindow
 import dev.chrisbanes.haze.HazeState
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 /**
@@ -88,62 +86,7 @@ interface PlayerHost {
     /** The full signal-chain readout, opened from the output drawer. */
     @Composable
     fun AudioPipelineDialog(hazeState: HazeState, isPlaying: Boolean, onDismiss: () -> Unit)
-
-    /** Casting to a network receiver. Absent, and so never drawn, where the platform has none. */
-    val castState: StateFlow<CastUi> get() = NoCast
-
-    /**
-     * The BitChord watch app as an output: the watch plays the queue the way a
-     * Cast receiver does. Absent, and so never drawn, where there is no watch.
-     */
-    val watchOutput: StateFlow<WatchOutputUi> get() = NoWatch
-
-    /** The output drawer opening: look for a watch in reach again. */
-    fun refreshWatchOutput() = Unit
-
-    /** Make the watch the speaker. */
-    fun selectWatchOutput() = Unit
-
-    /** The device picker the output drawer's Cast row opens, in the pipeline dialog's card. */
-    @Composable
-    fun CastDialog(hazeState: HazeState, onDismiss: () -> Unit) = Unit
-
-    /**
-     * Whether lines can be put on a share card here. False hides the pick mode
-     * altogether rather than offering a mode with nowhere to put its result.
-     */
-    val lyricsShareAvailable: Boolean get() = false
-
-    /**
-     * The picked lines, drawn as a picture this platform can write out and send.
-     * Absent, and so never called, where [lyricsShareAvailable] is false.
-     */
-    @Composable
-    fun LyricsShareSheet(hazeState: HazeState, request: LyricsShareRequest, onDismiss: () -> Unit) = Unit
 }
-
-private val NoCast = MutableStateFlow(CastUi())
-
-private val NoWatch = MutableStateFlow(WatchOutputUi())
-
-/** What the output drawer needs to draw the watch's row. */
-data class WatchOutputUi(
-    /** A watch with BitChord on it is in reach. False (and not [active]) hides the row. */
-    val available: Boolean = false,
-    /** What the watch calls itself; the drawer has a generic name for when it says nothing. */
-    val name: String? = null,
-    /** The watch is the speaker. */
-    val active: Boolean = false,
-)
-
-/** What the output drawer needs to know about casting to draw its row. */
-data class CastUi(
-    /** Whether this device can cast at all. False hides the row. */
-    val supported: Boolean = false,
-    /** The receiver the music is on now, or null when it is on this device. */
-    val connectedName: String? = null,
-    val connecting: Boolean = false,
-)
 
 /** Where the installed [PlayerHost] lives. */
 object PlayerPlatform {
@@ -166,10 +109,7 @@ interface PlayerSettingsSource {
     val canvasOverCellular: StateFlow<Boolean>
     val fullBleedArtwork: StateFlow<Boolean>
     val hideSongStatus: StateFlow<Boolean>
-    val showQueueHistory: StateFlow<Boolean>
     val hideVolumeBar: StateFlow<Boolean>
-    /** Hide the device status bar while the player is up. Always false where there is none. */
-    val hideStatusBar: StateFlow<Boolean>
     val lastPlayerScreen: StateFlow<LastPlayerScreen>
     val legacyMeshGradient: StateFlow<Boolean>
     val lyricsBlur: StateFlow<Boolean>
@@ -183,10 +123,6 @@ interface PlayerSettingsSource {
     val showNerdStats: StateFlow<Boolean>
     val smartAnalysis: StateFlow<SmartAnalysis>
     val smartFadeEnabled: StateFlow<Boolean>
-    /** True only while an analysed Automix transition is audibly mixing two tracks. */
-    val smartMixInProgress: StateFlow<Boolean>
-    /** The Automix blend in flight, for the scrubber's beat glow; null between blends. */
-    val smartMixBlend: StateFlow<MixBlend?>
     val smartTransitionWindow: StateFlow<TransitionWindow?>
     val spotifyCanvasAutoHide: StateFlow<Boolean>
     val syncedLyrics: StateFlow<Boolean>

@@ -303,7 +303,7 @@ object NerdStats {
     fun sourceFor(mediaId: String?): String? {
         val key = mediaId ?: return null
         return sources[key]
-            ?: SourceTrackKeys.parse(key)?.second?.let { sources[it] }
+            ?: trackKeyId(key)?.let { sources[it] }
     }
 
     fun pickedBitrateKbps(videoId: String?): Int? = videoId?.let { picked[it] }
@@ -333,7 +333,7 @@ object NerdStats {
     fun declaredFormat(mediaId: String?): StreamFormat? {
         val key = mediaId ?: return null
         return declared[key]
-            ?: SourceTrackKeys.parse(key)?.second?.let { declared[it] }
+            ?: trackKeyId(key)?.let { declared[it] }
     }
 
     fun onTrackTransition() {
@@ -378,6 +378,14 @@ object NerdStats {
         declared.clear()
         sources.clear()
     }
+
+    /**
+     * The catalogue id inside a source-scoped track key, or null when [key] is
+     * not one. Installed by the application that owns the source registry —
+     * the key format is that registry's, not this object's.
+     */
+    @Volatile
+    var trackKeyId: (String) -> String? = { null }
 
     private const val MAX_REMEMBERED = 64
 }
