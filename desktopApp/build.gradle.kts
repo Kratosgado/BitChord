@@ -7,27 +7,16 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 val appVersion: String = providers.gradleProperty("bitchord.version").orNull
     ?.removePrefix("v")
     ?.takeIf { it.isNotBlank() }
-    ?: "1.8-beta1"
+    ?: "1.5.2"
 
 /** Which platform this build is *for*, which is the host unless told otherwise. */
 val hostIsWindows = System.getProperty("os.name").contains("Windows", ignoreCase = true)
 val hostIsLinux = System.getProperty("os.name").contains("Linux", ignoreCase = true)
-val hostIsMac = System.getProperty("os.name").contains("Mac", ignoreCase = true)
 val targetOs: String = (providers.gradleProperty("bitchord.target").orNull ?: when {
     hostIsWindows -> "windows"
     hostIsLinux -> "linux"
-    hostIsMac -> "macos"
-    else -> error("BitChord desktop supports Linux, Windows, and macOS only")
+    else -> error("BitChord desktop supports Linux and Windows only")
 }).lowercase()
-
-val hostArch = System.getProperty("os.arch").lowercase()
-val isArm64 = hostArch == "aarch64" || hostArch == "arm64"
-
-// Windows installer metadata requires MAJOR.MINOR.BUILD even though the app's public version is
-// intentionally displayed without a patch number (1.7 rather than 1.7.0).
-// The build number is the desktop version code; it also keeps "-beta1" out of the numeric installer version.
-val desktopVersionCode = 29
-val nativePackageVersion = appVersion.substringBefore('-').split('.').take(2).joinToString(".") + ".$desktopVersionCode"
 
 // FFmpeg decodes audio; see DesktopAudioDecoder.
 val javacppVersion = "1.5.12"
@@ -35,8 +24,7 @@ val ffmpegVersion = "7.1.1-$javacppVersion"
 val nativeClassifier = when (targetOs) {
     "windows" -> "windows-x86_64"
     "linux" -> "linux-x86_64"
-    "macos" -> if (isArm64) "macosx-arm64" else "macosx-x86_64"
-    else -> error("BitChord desktop supports Linux, Windows, and macOS only")
+    else -> error("BitChord desktop supports Linux and Windows only")
 }
 private fun localProperty(name: String): String = rootProject.file("local.properties")
     .takeIf { it.isFile }
@@ -65,24 +53,8 @@ plugins {
 dependencies {
     // Already on the classpath through the NewPipe extractor.
     implementation("org.jsoup:jsoup:1.22.2")
-    implementation("com.google.zxing:core:3.5.3")
 
     implementation(project(":shared"))
-    // Its own copy of the player and pages; the phone and TV keep :sharedUi.
-    implementation(project(":desktopUi"))
-    // BotGuard, for the PoTokens YouTube's web clients need: the phone runs it in an Android
-    // WebView, the desktop in JavaFX's (WebKit). Per-platform jars carry the natives.
-    val javafxClassifier = when (targetOs) {
-        "windows" -> "win"
-        "macos" -> if (isArm64) "mac-aarch64" else "mac"
-        else -> "linux"
-    }
-    listOf("base", "graphics", "controls", "media", "web").forEach { module ->
-        implementation("org.openjfx:javafx-$module:21.0.10:$javafxClassifier")
-    }
-
-    // The shared player loads artwork through Coil, as the phone does.
-    implementation("io.coil-kt.coil3:coil-network-okhttp:3.0.4")
 
     // Automix runs the same two models the Android build does.
     implementation("com.microsoft.onnxruntime:onnxruntime:1.29.0")
@@ -94,11 +66,8 @@ dependencies {
     implementation("org.bytedeco:ffmpeg:$ffmpegVersion:$nativeClassifier")
 
     // The same backdrop blur the Android build uses for its floating bars.
-    // On Windows, 1.7.2 keeps this Compose Desktop 1.10.3 app on the matching UI/text/animation
-    // runtime. Preserve Linux's existing dependency graph exactly as it was.
-    val desktopHazeVersion = if (targetOs == "windows") "1.7.2" else "1.7.3"
-    implementation("dev.chrisbanes.haze:haze:$desktopHazeVersion")
-    implementation("dev.chrisbanes.haze:haze-materials:$desktopHazeVersion")
+    implementation("dev.chrisbanes.haze:haze:1.7.3")
+    implementation("dev.chrisbanes.haze:haze-materials:1.7.3")
 
     implementation(compose.runtime)
     implementation(compose.foundation)
@@ -106,13 +75,7 @@ dependencies {
     implementation(compose.components.resources)
     implementation(compose.materialIconsExtended)
     // The Skiko runtime rides in on this, and Skiko is per-platform.
-    implementation(
-        when (targetOs) {
-            "windows" -> compose.desktop.windows_x64
-            "macos" -> if (isArm64) compose.desktop.macos_arm64 else compose.desktop.macos_x64
-            else -> compose.desktop.linux_x64
-        }
-    )
+    implementation(if (targetOs == "windows") compose.desktop.windows_x64 else compose.desktop.linux_x64)
 
     implementation("io.ktor:ktor-client-core:3.0.3")
     implementation("io.ktor:ktor-client-cio:3.0.3")
@@ -127,9 +90,6 @@ dependencies {
     // Browsers keep their cookies in SQLite, and importing a session from one is how this app signs
     // in — see DesktopBrowserCookies.
     implementation("org.xerial:sqlite-jdbc:3.47.1.0")
-    // Chromium protects its Windows master key with DPAPI. JNA's platform helpers let the app
-    // unwrap that key in the same Windows user session without invoking a shell or exposing it.
-    implementation("net.java.dev.jna:jna-platform:5.19.1")
 
     // Linux desktop media controls use the standard session-bus MPRIS interfaces.
     implementation("com.github.hypfvieh:dbus-java-core:5.2.0")
@@ -146,14 +106,11 @@ dependencies {
     testImplementation(kotlin("test"))
 }
 
-tasks.withType<Test> {
-    systemProperty("java.awt.headless", "true")
-}
-
 kotlin {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_21)
     }
+    sourceSets["main"].kotlin.srcDir(rootProject.file("app/src/main/java/com/music/bitchord/ui/icons"))
 }
 
 java {
@@ -166,9 +123,6 @@ java {
 // Per target, because both write the library under the same name and a Windows cross-build
 // otherwise left a `.dll` where the next Linux run looked for its `.so`.
 val analysisNativeDir = layout.buildDirectory.dir("native/$targetOs")
-
-/** The tiny Windows frame bridge is independent of the optional analyser and SMTC libraries. */
-val windowNativeDir = layout.buildDirectory.dir("native-window/$targetOs")
 
 /**
  * Whether this build is producing the analyser for a platform that is not the one running the
@@ -245,46 +199,21 @@ val buildAnalysisNative by tasks.registering {
                     "a Gradle daemon started before it was on PATH may be in use: ./gradlew --stop",
             )
         }
-        val compilerName = if (crossing) "x86_64-w64-mingw32-g++" else "g++"
-        val compiler = targetOs != "windows" || findOnPath(compilerName) != null
-        val ninja = targetOs != "windows" || findOnPath("ninja") != null
-        if (cmake != null && (!compiler || !ninja)) {
+        val compiler = !crossing || findOnPath("x86_64-w64-mingw32-g++") != null
+        if (cmake != null && !compiler) {
             logger.lifecycle(
-                "$compilerName or Ninja not found — the Windows build will have no Automix analyser. " +
-                    "Install a MinGW C++ compiler and Ninja, then rebuild.",
+                "x86_64-w64-mingw32-g++ not found — the Windows build will have no Automix analyser. " +
+                    "On NixOS: nix-shell -p pkgsCross.mingwW64.buildPackages.gcc",
             )
         }
-        cmake != null && compiler && ninja
+        cmake != null && compiler
     }
     doLast {
         val javaHome = System.getProperty("java.home")
-        val compiler = if (targetOs == "windows") {
-            findOnPath(if (crossing) "x86_64-w64-mingw32-g++" else "g++")
-                ?: error("the Windows C++ compiler disappeared while building the analyser")
-        } else {
-            null
-        }
-        val ninja = if (targetOs == "windows") {
-            findOnPath("ninja") ?: error("Ninja disappeared while building the analyser")
-        } else {
-            null
-        }
         providers.exec {
             commandLine(
                 buildList {
                     addAll(listOf(cmakeBinary(), "-S", cmakeSource.absolutePath, "-B", outputDir.absolutePath))
-                    if (targetOs == "windows") {
-                        // The host may not have Visual Studio/nmake. Select the MinGW toolchain we
-                        // checked above and discard any generator cached by an earlier configure.
-                        addAll(
-                            listOf(
-                                "--fresh",
-                                "-G", "Ninja",
-                                "-DCMAKE_MAKE_PROGRAM=${ninja!!.absolutePath}",
-                                "-DCMAKE_CXX_COMPILER=${compiler!!.absolutePath}",
-                            ),
-                        )
-                    }
                     add("-DCMAKE_BUILD_TYPE=Release")
                     if (crossing) add("-DCMAKE_TOOLCHAIN_FILE=${toolchain.absolutePath}")
                 },
@@ -298,72 +227,10 @@ val buildAnalysisNative by tasks.registering {
     }
 }
 
-/**
- * Builds the Win32/DWM frame bridge even when the much larger analyser build is skipped during a
- * desktop UI run. It is intentionally absent from Linux builds, whose window manager remains the
- * sole owner of decoration and behaviour.
- */
-val buildWindowNative by tasks.registering {
-    val cmakeSource = project.file("native/window")
-    val outputDir = windowNativeDir.get().asFile
-    val crossing = crossBuildingForWindows
-    val toolchain = project.file("native/mingw-w64.cmake")
-    inputs.dir(cmakeSource)
-    inputs.property("target", targetOs)
-    outputs.dir(outputDir)
-    onlyIf {
-        if (targetOs != "windows") return@onlyIf false
-        val cmake = findOnPath("cmake")
-        val compiler = findOnPath(if (crossing) "x86_64-w64-mingw32-g++" else "g++")
-        val ninja = findOnPath("ninja")
-        if (cmake == null || compiler == null || ninja == null) {
-            logger.lifecycle(
-                "cmake, Ninja, or a MinGW C++ compiler is unavailable — the Windows build will " +
-                    "fall back to Compose's frameless window behaviour.",
-            )
-        }
-        cmake != null && compiler != null && ninja != null
-    }
-    doLast {
-        val javaHome = System.getProperty("java.home")
-        val compiler = findOnPath(if (crossing) "x86_64-w64-mingw32-g++" else "g++")
-            ?: error("MinGW C++ compiler disappeared while building the Windows frame")
-        val ninja = findOnPath("ninja")
-            ?: error("Ninja disappeared while building the Windows frame")
-        providers.exec {
-            commandLine(
-                buildList {
-                    addAll(
-                        listOf(
-                            cmakeBinary(),
-                            "-S", cmakeSource.absolutePath,
-                            "-B", outputDir.absolutePath,
-                            "-G", "Ninja",
-                            "-DCMAKE_MAKE_PROGRAM=${ninja.absolutePath}",
-                            "-DCMAKE_CXX_COMPILER=${compiler.absolutePath}",
-                            "-DCMAKE_BUILD_TYPE=Release",
-                        ),
-                    )
-                    if (crossing) add("-DCMAKE_TOOLCHAIN_FILE=${toolchain.absolutePath}")
-                },
-            )
-            environment("JAVA_HOME", javaHome)
-        }.result.get().assertNormalExitValue()
-        providers.exec {
-            commandLine(cmakeBinary(), "--build", outputDir.absolutePath, "-j", "4")
-            environment("JAVA_HOME", javaHome)
-        }.result.get().assertNormalExitValue()
-    }
-}
-
 tasks.named<ProcessResources>("processResources") {
-    dependsOn(buildAnalysisNative, buildWindowNative)
+    dependsOn(buildAnalysisNative)
     from(analysisNativeDir) {
         include("*.so", "*.dll", "*.dylib")
-        into("native")
-    }
-    from(windowNativeDir) {
-        include("*.dll")
         into("native")
     }
     // The Automix models, taken from the Android module rather than copied into this one.
@@ -371,15 +238,6 @@ tasks.named<ProcessResources>("processResources") {
         include("*.onnx")
         into("models")
     }
-}
-
-// Kotlin 2.4 no longer contributes this JVM target's compiler output to Gradle's plain `jar`
-// task in this project. Compose's dev runner and the portable launcher both use that jar, so add
-// the output explicitly instead of producing a resources-only application archive.
-tasks.named<Jar>("jar") {
-    val kotlinClasses = tasks.named<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>("compileKotlin")
-    dependsOn(kotlinClasses)
-    from(kotlinClasses.flatMap { it.destinationDirectory })
 }
 
 /** A Windows build that can be assembled here, since an installer cannot be. */
@@ -447,9 +305,6 @@ val windowsPortableAssemble by tasks.registering {
             ZipFile(jar).use { zip -> zip.getEntry(entry) != null }
         }
         val problems = buildList {
-            if (!holds("com/music/bitchord/desktop/MainKt.class")) {
-                add("the BitChord desktop entry point is missing")
-            }
             if (!holds("androidx/compose/runtime/Composer.class")) {
                 add("the Compose runtime is missing")
             }
@@ -493,9 +348,6 @@ val composeMainClass = "com.music.bitchord.desktop.MainKt"
 
 compose.desktop {
     application {
-        javaHome = javaToolchains.launcherFor(java.toolchain).map {
-            it.metadata.installationPath.asFile.absolutePath
-        }.get()
         mainClass = composeMainClass
         jvmArgs("-Xmx512m")
         jvmArgs("-XX:+UseG1GC", "-XX:G1PeriodicGCInterval=20000", "-XX:G1PeriodicGCSystemLoadThreshold=0")
@@ -519,15 +371,13 @@ compose.desktop {
 
         nativeDistributions {
             targetFormats(
-                TargetFormat.Dmg,
-                TargetFormat.Pkg,
                 TargetFormat.Exe,
                 TargetFormat.Msi,
                 TargetFormat.Deb,
                 TargetFormat.Rpm,
             )
             packageName = "BitChord"
-            packageVersion = nativePackageVersion
+            packageVersion = appVersion
             description = if (targetOs == "windows") "BitChord" else "Aesthetic YouTube Music client"
             vendor = "BitChord contributors"
             copyright = "Copyright © 2026 BitChord contributors"
@@ -546,28 +396,11 @@ compose.desktop {
                 "java.xml",
                 "jdk.crypto.ec",
                 "jdk.dynalink",
-                // JavaFX WebEngine returns JavaScript objects through netscape.javascript.JSObject.
-                // Without this module the slim production runtime crashes in twkExecuteScript,
-                // while development runs work because the full JDK already contains it.
-                "jdk.jsobject",
                 "jdk.localedata",
                 "jdk.security.auth",
                 "jdk.unsupported",
                 "jdk.zipfs",
             )
-
-            macOS {
-                iconFile.set(project.file("packaging/icons/AppIcon.icns"))
-                bundleID = "com.music.bitchord"
-                appCategory = "public.app-category.music"
-                dockName = "BitChord"
-                infoPlist {
-                    extraKeysRawXml = """
-                        <key>NSRequiresAquaSystemAppearance</key>
-                        <false/>
-                    """.trimIndent()
-                }
-            }
 
             linux {
                 iconFile.set(project.file("packaging/icons/AppIcon.png"))
@@ -582,7 +415,7 @@ compose.desktop {
                 upgradeUuid = "8f3c1d24-6a2b-4f5e-9c17-2b8d54e0a913"
                 menuGroup = "BitChord"
                 shortcut = true
-                dirChooser = false
+                dirChooser = true
                 perUserInstall = true
             }
         }

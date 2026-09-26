@@ -1,6 +1,5 @@
 package com.music.bitchord.desktop
 
-import com.music.bitchord.data.lyrics.LyricsSource
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -23,11 +22,13 @@ class DesktopLyricsSourceOrderTest {
     }
 
     @Test
-    fun theDesktopOffersThePhonesProvidersInThePhonesOrder() {
-        // One provider list for both apps: the lookup is the phone's LyricsRepository.
+    fun theAppleHostsLeadOutOfTheBox() {
+        // The three of them carry the same catalogue and it is the one with the voices in it.
         val names = DesktopLyricsClient.sources.map { it.name }
-        assertEquals(LyricsSource.offered.map { it.label }, names)
-        assertTrue(names.all { lyricsSourceNamed(it) != null })
+        assertEquals(listOf("BiniLyrics", "BetterLyrics", "PaxSenix"), names.take(3))
+        // LyricsPlus has the finest timing and the least reliable hosting, so a track does not wait
+        // on a mirror that is down to be told what three other hosts already had.
+        assertTrue(names.indexOf("LyricsPlus") > names.indexOf("BetterLyrics"))
         // The unsynced fallback is last by definition.
         assertEquals("Genius", names.last())
     }

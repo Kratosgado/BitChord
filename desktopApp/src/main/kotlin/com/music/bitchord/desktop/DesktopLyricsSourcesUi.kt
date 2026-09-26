@@ -64,9 +64,8 @@ internal fun DesktopLyricsSourcesDialog(
 ) {
     DesktopDialogPanel(onDismiss = onDismiss, maxWidth = 420) {
         Column(
-            Modifier.fillMaxWidth().padding(horizontal = panelInset(20.dp), vertical = 18.dp),
-            // A card centres its heading; a page starts it on the gutter its rows start on.
-            horizontalAlignment = if (LocalDesktopPanelIsPage.current) Alignment.Start else Alignment.CenterHorizontally,
+            Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 18.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
                 DesktopStrings["lyrics_sources", "Lyrics sources"],
@@ -82,7 +81,7 @@ internal fun DesktopLyricsSourcesDialog(
                 ],
                 style = MaterialTheme.typography.bodySmall,
                 color = DesktopSecondary,
-                textAlign = if (LocalDesktopPanelIsPage.current) TextAlign.Start else TextAlign.Center,
+                textAlign = TextAlign.Center,
                 modifier = Modifier.padding(top = 5.dp),
             )
         }
@@ -93,7 +92,7 @@ internal fun DesktopLyricsSourcesDialog(
         Column(
             Modifier
                 .fillMaxWidth()
-                .then(desktopPanelBody(cardMax = 340.dp))
+                .heightIn(max = 340.dp)
                 .verticalScroll(rememberScrollState()),
         ) {
             ReorderableSourceList(order, enabled, onReorder, onToggle)
@@ -107,7 +106,7 @@ internal fun DesktopLyricsSourcesDialog(
             onClick = { onPrioritizeSyllables(!prioritizeSyllables) },
         )
         DesktopCardRule()
-        Row(Modifier.fillMaxWidth().padding(horizontal = panelInset(12.dp), vertical = 6.dp)) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp)) {
             TextButton(onClick = onReset) { Text(DesktopStrings["reset_to_default", "Reset to default"], color = DesktopSecondary) }
             Spacer(Modifier.weight(1f))
             TextButton(onClick = onDismiss) { Text(DesktopStrings["done", "Done"], color = DesktopAccent) }
@@ -269,15 +268,14 @@ private fun CheckableRow(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
-    val washed = hovered && enabled && !LocalDesktopPanelIsPage.current
     Row(
         Modifier
             .fillMaxWidth()
             .heightIn(min = 52.dp)
-            .background(if (washed) DesktopRowHover else Color.Transparent)
+            .background(if (hovered && enabled) DesktopRowHover else Color.Transparent)
             .hoverable(interaction, enabled = enabled)
-            .desktopRowClickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = panelInset(18.dp), vertical = 9.dp),
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 18.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         leading?.let {

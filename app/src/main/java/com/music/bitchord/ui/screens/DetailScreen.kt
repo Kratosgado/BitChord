@@ -586,7 +586,10 @@ fun DetailScreen(
                         onShuffle = { onShuffle(songs) },
                         subscription = page.subscription?.takeIf { onToggleSubscription != null },
                         onToggleSubscription = onToggleSubscription,
-                        bottomSpace = 22.dp,
+                        // Halved when an About section follows directly — see
+                        // [AboutSection]'s own top inset, which makes up the
+                        // rest of that shorter gap.
+                        bottomSpace = if (description.isNullOrBlank()) 22.dp else 11.dp,
                         playColor = appleArt?.keyColor?.let { Color(it) },
                     )
                 }

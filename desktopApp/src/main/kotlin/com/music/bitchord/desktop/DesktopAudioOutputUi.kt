@@ -35,17 +35,16 @@ import com.music.bitchord.ui.icons.BitChordIcons
 @Composable
 internal fun DesktopAudioOutputDialog(onDismiss: () -> Unit) {
     val selected by DesktopAudioDevices.selected.collectAsState()
-    val changes by DesktopAudioDevices.changes.collectAsState()
-    val devices = remember(changes) { DesktopAudioDevices.available() }
+    val devices = remember { DesktopAudioDevices.available() }
     DesktopDialogPanel(onDismiss = onDismiss, maxWidth = 440) {
-        Column(Modifier.padding(horizontal = panelInset(22.dp), vertical = 22.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(
                 DesktopStrings["audio_output", "Audio output"],
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
             )
             Text(
-                DesktopStrings["d_audio_output_subtitle", "Changes take effect immediately."],
+                DesktopStrings["d_audio_output_subtitle", "A change takes effect on the next track."],
                 color = DesktopSecondary,
                 style = MaterialTheme.typography.bodySmall,
             )
@@ -74,8 +73,8 @@ private fun OutputRow(name: String, description: String, chosen: Boolean, onClic
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(10.dp))
-            .desktopRowClickable(onClick = onClick)
-            .padding(horizontal = panelInset(12.dp), vertical = 10.dp),
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {

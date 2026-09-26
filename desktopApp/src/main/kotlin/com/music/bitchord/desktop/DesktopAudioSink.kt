@@ -10,19 +10,8 @@ internal class DesktopAudioSink {
 
     private var line: SourceDataLine? = null
 
-    /** True while the Windows shared-mode sink owns the output instead of Java Sound. */
-    private var windowsOutput = false
-
-    private var windowsBufferBytes = 0
-
-    /** The selection for which [line] was opened, including the blank system-default choice. */
-    private var openedForSelection: String? = null
-
     /** Reused conversion buffer; only the playback thread touches it. */
     private var staging = ByteArray(0)
-
-    /** Kept short: enough to distinguish real samples from a pipeline producing silence. */
-    private var diagnosticBlocks = 0
 
     /** The format the mixer accepted, valid once [open] has succeeded. */
     var format: DesktopPcmFormat = DesktopPcmFormat(44_100, 2, 2)
@@ -32,42 +21,11 @@ internal class DesktopAudioSink {
     @Volatile
     var gain: Float = 1f
 
-    val isOpen: Boolean get() = windowsOutput || line != null
-
-    /** Whether the live line already belongs to the choice currently shown in the player. */
-    fun isUsingSelection(id: String): Boolean = isOpen && openedForSelection == id
+    val isOpen: Boolean get() = line != null
 
     /** Opens the best line the mixer will give for [requested]. */
     fun open(requested: DesktopPcmFormat): Result<DesktopPcmFormat> = runCatching {
-        val selectedDevice = DesktopAudioDevices.selected.value
-        if (DesktopPlatform.isWindows) {
-            val native = DesktopWindowsAudio.open(selectedDevice, requested)
-            if (native.isSuccess) {
-                val previous = line
-                line = null
-                windowsOutput = true
-                windowsBufferBytes = native.getOrThrow()
-                // Read live from the native side instead: it moves the stream itself when the
-                // Windows default changes or a chosen device is unplugged.
-                openedOn = null
-                openedForSelection = selectedDevice
-                format = requested
-                diagnosticBlocks = 0
-                closeLine(previous)
-                DesktopTrackLog.log(
-                    "audio output opened: ${deviceName ?: "Windows system default"} · " +
-                        "${requested.sampleRate} Hz · ${requested.channels} ch · WASAPI shared",
-                )
-                return@runCatching requested
-            }
-            DesktopTrackLog.log("WASAPI output unavailable; trying Java Sound: ${native.exceptionOrNull()?.message}")
-        }
-
-        if (windowsOutput) {
-            DesktopWindowsAudio.close()
-            windowsOutput = false
-            windowsBufferBytes = 0
-        }
+        close()
         val ladder = buildList {
             add(requested)
             if (requested.isFloat) add(requested.copy(bytesPerSample = 2, isFloat = false))
@@ -84,7 +42,7 @@ internal class DesktopAudioSink {
 
         // The chosen device, when there is one and it is still plugged in; otherwise whatever the
         // system calls the default.
-        val mixer = DesktopAudioDevices.mixerFor(selectedDevice)
+        val mixer = DesktopAudioDevices.mixerFor(DesktopAudioDevices.selected.value)
         val supports: (DesktopPcmFormat) -> Boolean = { candidate ->
             if (mixer == null) {
                 AudioSystem.isLineSupported(infoFor(candidate))
@@ -100,30 +58,12 @@ internal class DesktopAudioSink {
         } else {
             mixer.getLine(infoFor(accepted)) as SourceDataLine
         }
-        try {
-            // Roughly a fifth of a second in the device's hands.
-            opened.open(accepted.toAudioFormat(), accepted.byteRate / 5)
-            opened.start()
-        } catch (failure: Throwable) {
-            runCatching { opened.close() }
-            throw failure
-        }
-
-        // Do not tear down the working route until its replacement is known to have opened. A
-        // Bluetooth device can disappear between enumeration and this call; that must not turn a
-        // failed switch into silent playback on every other device too.
-        val previous = line
-        line = opened
         openedOn = mixer?.mixerInfo?.name
-        openedForSelection = selectedDevice
+        // Roughly a fifth of a second in the device's hands.
+        opened.open(accepted.toAudioFormat(), accepted.byteRate / 5)
+        opened.start()
+        line = opened
         format = accepted
-        diagnosticBlocks = 0
-        closeLine(previous)
-        DesktopTrackLog.log(
-            "audio output opened: ${deviceName ?: "system default"} · " +
-                "${accepted.sampleRate} Hz · ${accepted.channels} ch · " +
-                (if (accepted.isFloat) "32-bit float" else "${accepted.bytesPerSample * 8}-bit PCM"),
-        )
         accepted
     }
 
@@ -135,11 +75,7 @@ internal class DesktopAudioSink {
      */
     val deviceName: String?
         get() = runCatching {
-            if (windowsOutput) {
-                DesktopWindowsAudio.deviceName()
-            } else {
-                line?.let { openedOn ?: AudioSystem.getMixer(null).mixerInfo?.name?.takeIf(String::isNotBlank) }
-            }
+            line?.let { openedOn ?: AudioSystem.getMixer(null).mixerInfo?.name?.takeIf(String::isNotBlank) }
         }.getOrNull()
 
     /** The mixer this line was actually opened on, when it was not the system default. */
@@ -147,35 +83,14 @@ internal class DesktopAudioSink {
 
     /** How much audio the device is holding, in bytes; 0 before the line is open. */
     val bufferBytes: Int
-        get() = if (windowsOutput) windowsBufferBytes else runCatching { line?.bufferSize ?: 0 }.getOrDefault(0)
+        get() = runCatching { line?.bufferSize ?: 0 }.getOrDefault(0)
 
     /** Writes [count] interleaved samples, blocking until the device takes them. */
     fun write(samples: FloatArray, count: Int): Int {
-        if (windowsOutput) {
-            val written = DesktopWindowsAudio.write(samples, count, gain)
-            diagnose(samples, count, written)
-            return written
-        }
         val target = line ?: return 0
         if (count <= 0) return 0
         val bytes = convert(samples, count)
-        val written = target.write(bytes, 0, count * format.bytesPerSample)
-        diagnose(samples, count, written)
-        return written
-    }
-
-    private fun diagnose(samples: FloatArray, count: Int, written: Int) {
-        if (diagnosticBlocks < DIAGNOSTIC_BLOCK_LIMIT) {
-            diagnosticBlocks++
-            val peak = (0 until minOf(count, samples.size)).maxOfOrNull { kotlin.math.abs(samples[it]) } ?: 0f
-            if (peak > AUDIBLE_SIGNAL_FLOOR || diagnosticBlocks == DIAGNOSTIC_BLOCK_LIMIT) {
-                DesktopTrackLog.log(
-                    "audio output signal: peak=${"%.4f".format(java.util.Locale.ROOT, peak)} " +
-                        "gain=${"%.2f".format(java.util.Locale.ROOT, gain)} wrote=$written bytes",
-                )
-                diagnosticBlocks = DIAGNOSTIC_BLOCK_LIMIT
-            }
-        }
+        return target.write(bytes, 0, count * format.bytesPerSample)
     }
 
     /** Floats to whatever the device accepted, scaled by [gain]. */
@@ -213,47 +128,29 @@ internal class DesktopAudioSink {
     }
 
     /** Frames the device has actually rendered — the honest playback position. */
-    fun framesPlayed(): Long =
-        if (windowsOutput) DesktopWindowsAudio.framesPlayed() else line?.longFramePosition ?: 0L
+    fun framesPlayed(): Long = line?.longFramePosition ?: 0L
 
     fun pause() {
-        if (windowsOutput) DesktopWindowsAudio.pause() else line?.stop()
+        line?.stop()
     }
 
     fun resume() {
-        if (windowsOutput) DesktopWindowsAudio.resume() else line?.start()
+        line?.start()
     }
 
     /** Throws away what is queued, so a seek is heard at once. */
     fun flush() {
-        if (windowsOutput) DesktopWindowsAudio.flush() else line?.flush()
+        line?.flush()
     }
 
     /** Waits for the queue to finish, so the end of a track is not clipped. */
     fun drain() {
-        if (windowsOutput) DesktopWindowsAudio.drain() else runCatching { line?.drain() }
+        runCatching { line?.drain() }
     }
 
     fun close() {
-        if (windowsOutput) {
-            DesktopWindowsAudio.close()
-            windowsOutput = false
-            windowsBufferBytes = 0
-            openedOn = null
-            openedForSelection = null
-            diagnosticBlocks = 0
-            return
-        }
         val target = line ?: return
         line = null
-        openedOn = null
-        openedForSelection = null
-        diagnosticBlocks = 0
-        closeLine(target)
-    }
-
-    private fun closeLine(target: SourceDataLine?) {
-        if (target == null) return
         runCatching {
             target.stop()
             target.flush()
@@ -263,11 +160,6 @@ internal class DesktopAudioSink {
 
     private fun infoFor(candidate: DesktopPcmFormat) =
         DataLine.Info(SourceDataLine::class.java, candidate.toAudioFormat())
-
-    private companion object {
-        const val DIAGNOSTIC_BLOCK_LIMIT = 50
-        const val AUDIBLE_SIGNAL_FLOOR = 0.001f
-    }
 }
 
 /** The same format in JavaSound's vocabulary. */

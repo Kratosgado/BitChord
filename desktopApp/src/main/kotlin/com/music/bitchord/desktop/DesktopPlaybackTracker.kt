@@ -5,8 +5,6 @@ import io.ktor.client.engine.cio.CIO
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.parameter
-import com.music.bitchord.data.innertube.Innertube
-import com.music.bitchord.data.innertube.StreamResolver
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -55,6 +53,7 @@ internal object DesktopPlaybackTracker {
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val lock = Mutex()
+    private val client = HttpClient(CIO)
 
     @Volatile
     private var session: Session? = null
@@ -98,7 +97,7 @@ internal object DesktopPlaybackTracker {
             current.atrSent = true
             current.tracking.atrUrl?.let { url ->
                 scope.launch {
-                    runCatching { Innertube.pingAtr(url, current.cpn) }
+                    runCatching { pingAtr(url, current.cpn) }
                         .onFailure { DesktopTrackLog.log("history: atr ping failed — ${it.message}") }
                 }
             }
@@ -149,7 +148,7 @@ internal object DesktopPlaybackTracker {
     private suspend fun open(videoId: String): Boolean = lock.withLock {
         // The one thing the tracking request cannot be answered without.
         val signatureTimestamp = withContext(Dispatchers.IO) {
-            StreamResolver.signatureTimestamp(videoId)
+            DesktopYouTubeUnlocker.signatureTimestamp(videoId)
         }
         if (signatureTimestamp == null) {
             DesktopTrackLog.log("history: no signature timestamp yet for '$videoId'; will retry")
@@ -161,8 +160,8 @@ internal object DesktopPlaybackTracker {
             DesktopTrackLog.log("history: YouTube offered no tracking for '$videoId'")
             return@withLock true
         }
-        val fresh = Session(videoId, Innertube.newCpn(), tracking)
-        val status = Innertube.pingPlayback(tracking.playbackUrl, fresh.cpn)
+        val fresh = Session(videoId, newCpn(), tracking)
+        val status = pingStats(tracking.playbackUrl, fresh.cpn) {}
         session = fresh
         DesktopTrackLog.log("history: entry created for '$videoId' (HTTP $status)")
         true
@@ -175,7 +174,15 @@ internal object DesktopPlaybackTracker {
         if (!final && positionSeconds <= target.reportedSeconds) return
         target.flushingTo = maxOf(target.flushingTo, positionSeconds)
         lock.withLock {
-            val status = Innertube.pingWatchtime(url, target.cpn, positionSeconds, final)
+            val status = pingStats(url, target.cpn) {
+                parameter("st", "0")
+                parameter("et", positionSeconds.toString())
+                // Where the playhead is, as distinct from how much was heard: the web client sends
+                // both and they are not redundant.
+                parameter("cmt", positionSeconds.toString())
+                parameter("state", if (final) "paused" else "playing")
+                if (final) parameter("final", "1")
+            }
             target.reportedSeconds = maxOf(target.reportedSeconds, positionSeconds)
             DesktopTrackLog.log(
                 "history: ${positionSeconds}s reported for '${target.videoId}'" +
@@ -184,19 +191,82 @@ internal object DesktopPlaybackTracker {
         }
     }
 
-    /** The tracking block of the session's own player response — the phone's request, shared. */
+    /**
+     * The player response fetched *with* the session, purely to read its `playbackTracking` block.
+     */
     private suspend fun trackingFor(videoId: String, signatureTimestamp: Int): Tracking? {
-        val tracking = runCatching { Innertube.playbackTracking(videoId, signatureTimestamp) }.getOrNull()
+        val response = DesktopSearchClient.playerForTracking(videoId, signatureTimestamp).getOrNull() ?: return null
+        val tracking = response["playbackTracking"] as? JsonObject
         if (tracking == null) {
-            DesktopTrackLog.log("history: no tracking block for '$videoId'")
+            val playability = response["playabilityStatus"] as? JsonObject
+            DesktopTrackLog.log(
+                "history: no tracking block for '$videoId' " +
+                    "(status=${playability?.get("status")?.jsonPrimitive?.contentOrNull})",
+            )
             return null
         }
+        val playbackUrl = tracking.trackingUrl("videostatsPlaybackUrl") ?: return null
         return Tracking(
-            playbackUrl = tracking.playbackUrl,
-            watchtimeUrl = tracking.watchtimeUrl,
-            atrUrl = tracking.atrUrl,
-            atrAfterSeconds = tracking.atrAfterSeconds,
+            playbackUrl = playbackUrl,
+            watchtimeUrl = tracking.trackingUrl("videostatsWatchtimeUrl"),
+            atrUrl = tracking.trackingUrl("atrUrl"),
+            atrAfterSeconds = (tracking["atrUrl"] as? JsonObject)
+                ?.get("elapsedMediaTimeSeconds")?.jsonPrimitive?.contentOrNull
+                ?.toLongOrNull() ?: DEFAULT_ATR_SECONDS,
         )
     }
 
+    private fun JsonObject.trackingUrl(key: String): String? =
+        (this[key] as? JsonObject)?.get("baseUrl")?.jsonPrimitive?.contentOrNull
+
+    /** The `atr` ping. */
+    private suspend fun pingAtr(baseUrl: String, cpn: String): Int =
+        client.get(baseUrl) {
+            parameter("cpn", cpn)
+            statsHeaders()
+        }.status.value
+
+    /** The shared shape of the s.youtube.com pings, including session auth. */
+    private suspend fun pingStats(
+        baseUrl: String,
+        cpn: String,
+        extras: io.ktor.client.request.HttpRequestBuilder.() -> Unit,
+    ): Int = client.get(baseUrl) {
+        parameter("ver", "2")
+        parameter("c", "WEB_REMIX")
+        parameter("cver", DesktopSearchClient.CLIENT_VERSION)
+        parameter("cpn", cpn)
+        // What the web client says about itself.
+        parameter("cplayer", "UNIPLAYER")
+        parameter("cbr", "Chrome")
+        parameter("cbrver", "141.0.0.0")
+        parameter("cos", "Windows")
+        parameter("cosver", "10.0")
+        parameter("hl", "en_US")
+        parameter("cr", "US")
+        extras()
+        statsHeaders()
+    }.status.value
+
+    private suspend fun io.ktor.client.request.HttpRequestBuilder.statsHeaders() {
+        header("Origin", DesktopYouTubeAuth.MUSIC_ORIGIN)
+        header("Referer", "${DesktopYouTubeAuth.MUSIC_ORIGIN}/")
+        header("User-Agent", WEB_USER_AGENT)
+        DesktopYouTubeSession.ensureVisitorData()?.let { header("X-Goog-Visitor-Id", it) }
+        DesktopYouTubeAuth.headers(DesktopYouTubeAuth.MUSIC_ORIGIN)
+            .forEach { (name, value) -> header(name, value) }
+    }
+
+    /** The client-playback-nonce tying one play's pings together. */
+    private fun newCpn(): String = (1..16).map { CPN_ALPHABET.random(Random) }.joinToString("")
+
+    private const val CPN_ALPHABET =
+        "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_"
+
+    /** What YouTube Music itself schedules `atr` for, when it does not say. */
+    private const val DEFAULT_ATR_SECONDS = 5L
+
+    private const val WEB_USER_AGENT =
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+            "(KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36"
 }

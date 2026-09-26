@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -37,7 +38,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.music.bitchord.data.NerdStats
 import com.music.bitchord.data.model.Song
 import com.music.bitchord.ui.icons.BitChordIcons
 import java.util.Locale
@@ -54,7 +54,6 @@ import kotlin.math.roundToInt
 @Composable
 internal fun DesktopIntegrationsDialog(
     song: Song?,
-    spotify: DesktopSpotifyConnection,
     onOpenLastfm: () -> Unit,
     onOpenListenBrainz: () -> Unit,
     onOpenDiscordToken: () -> Unit,
@@ -65,22 +64,21 @@ internal fun DesktopIntegrationsDialog(
 
     DesktopDialogPanel(onDismiss = onDismiss, maxWidth = 460) {
         Column(
-            desktopPanelBody(cardMax = 620.dp).verticalScroll(rememberScrollState()),
+            Modifier.heightIn(max = 620.dp).verticalScroll(rememberScrollState()),
         ) {
             Text(
                 DesktopStrings["account_integrations", "Account & integrations"],
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = Color.White,
-                modifier = Modifier.padding(start = panelInset(20.dp), end = panelInset(20.dp), top = 18.dp, bottom = 12.dp),
+                modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 18.dp, bottom = 12.dp),
             )
-            SpotifySection(spotify)
             DiscordSection(song, onOpenDiscordToken, onChoose = { choosing = it }, onEdit = { editing = it })
             ScrobblingSection(onOpenLastfm, onOpenListenBrainz)
         }
         DesktopCardRule()
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = panelInset(16.dp), vertical = 10.dp),
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
             horizontalArrangement = Arrangement.End,
         ) {
             TextButton(onClick = onDismiss) { Text(DesktopStrings["done", "Done"], color = DesktopAccent) }
@@ -109,64 +107,6 @@ internal fun DesktopIntegrationsDialog(
     }
 }
 
-/** The Spotify account, as the app holds it: an `sp_dc` cookie, and how to get or drop one. */
-internal class DesktopSpotifyConnection(
-    val connected: Boolean,
-    /** Whether the sign-in window can be shown; without it only pasting is left. */
-    val canSignIn: Boolean,
-    val signingIn: Boolean,
-    val error: String?,
-    /** Opens the sign-in window, or closes the one already open. */
-    val onSignIn: () -> Unit,
-    val onPasteCookie: () -> Unit,
-    val onDisconnect: () -> Unit,
-)
-
-/** Android's Spotify group, with Canvas in place of the playlists the desktop does not show yet. */
-@Composable
-private fun SpotifySection(spotify: DesktopSpotifyConnection) {
-    PanelGroup(
-        header = "Spotify",
-        footer = spotify.error
-            ?: "Sign in to show Spotify Canvas behind your tracks. Playback uses YouTube Music.",
-    ) {
-        PanelActionRow(
-            title = "Spotify",
-            subtitle = when {
-                spotify.connected -> DesktopStrings["connected", "Connected"]
-                spotify.signingIn -> "Finish signing in in the Spotify window. Click to cancel"
-                spotify.canSignIn -> "Click to sign in"
-                else -> "Click to paste your sp_dc cookie"
-            },
-            destructive = false,
-            onClick = {
-                when {
-                    // Connected: the cookie page, to see or replace what is held.
-                    spotify.connected || !spotify.canSignIn -> spotify.onPasteCookie()
-                    else -> spotify.onSignIn()
-                }
-            },
-        )
-        if (spotify.connected) {
-            DesktopCardRule()
-            PanelActionRow(
-                title = DesktopStrings["spotify_disconnect", "Disconnect"],
-                subtitle = "Forgets the sp_dc cookie; Canvas stops until you sign in again",
-                destructive = true,
-                onClick = spotify.onDisconnect,
-            )
-        } else if (spotify.canSignIn && !spotify.signingIn) {
-            DesktopCardRule()
-            PanelActionRow(
-                title = "Paste a cookie instead",
-                subtitle = "Copy sp_dc from open.spotify.com yourself",
-                destructive = false,
-                onClick = spotify.onPasteCookie,
-            )
-        }
-    }
-}
-
 @Composable
 private fun DiscordSection(
     song: Song?,
@@ -187,8 +127,6 @@ private fun DiscordSection(
     val button1Visible by DesktopDiscordSettings.button1Visible.collectAsState()
     val button2Text by DesktopDiscordSettings.button2Text.collectAsState()
     val button2Visible by DesktopDiscordSettings.button2Visible.collectAsState()
-    val showAudioQuality by DesktopDiscordSettings.showAudioQuality.collectAsState()
-    val nerdStats by NerdStats.current.collectAsState()
     LaunchedEffect(Unit) { DesktopDiscordRpc.refreshLocalClient() }
 
     val connected = local || token.isNotBlank()
@@ -225,14 +163,6 @@ private fun DiscordSection(
             checked = advanced,
             enabled = connected && rpcEnabled,
             onCheckedChange = DesktopDiscordSettings::setAdvancedMode,
-        )
-        DesktopCardRule()
-        PanelSwitchRow(
-            title = DesktopStrings["show_audio_quality", "Show audio quality"],
-            subtitle = DesktopStrings["show_audio_quality_subtitle", "Hi-Res, lossless and Dolby specs on the presence card"],
-            checked = showAudioQuality,
-            enabled = connected && rpcEnabled,
-            onCheckedChange = DesktopDiscordSettings::setShowAudioQuality,
         )
     }
 
@@ -325,7 +255,6 @@ private fun DiscordSection(
 
     PanelGroup(
         header = "Preview",
-        boxed = true,
         footer = if (song == null) "Play something to fill in the preview." else null,
     ) {
         RichPresencePreview(
@@ -333,7 +262,6 @@ private fun DiscordSection(
             heading = activityName.ifEmpty { DesktopDiscordSettings.APP_NAME },
             verb = DesktopDiscordSettings.activityVerb(activityType),
             useDetails = useDetails,
-            audioQuality = desktopAudioQualityLine(nerdStats).takeIf { showAudioQuality },
             button1Text = button1Text,
             button1Visible = button1Visible,
             button2Text = button2Text,
@@ -398,13 +326,13 @@ private fun ScrobblingSection(onOpenLastfm: () -> Unit, onOpenListenBrainz: () -
         DesktopCardRule()
         PanelSwitchRow(
             title = "Last.fm",
-            // No API-key gate: a build without baked-in credentials asks for the
-            // listener's own key and secret in the sign-in dialog instead.
             subtitle = when {
+                !DesktopScrobbling.canSignInToLastFm -> "This build has no Last.fm API key"
                 signedIn -> "Signed in as $lastfmUser"
                 else -> "Tap to sign in"
             },
             checked = lastfmEnabled,
+            enabled = DesktopScrobbling.canSignInToLastFm,
             onCheckedChange = { checked ->
                 if (checked && !signedIn) onOpenLastfm() else DesktopScrobbleSettings.setLastfmEnabled(checked)
             },
@@ -480,7 +408,6 @@ private fun RichPresencePreview(
     heading: String,
     verb: String,
     useDetails: Boolean,
-    audioQuality: String?,
     button1Text: String,
     button1Visible: Boolean,
     button2Text: String,
@@ -523,7 +450,7 @@ private fun RichPresencePreview(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                audioQuality?.let {
+                song?.albumName?.let {
                     Text(
                         it,
                         style = MaterialTheme.typography.bodySmall,
@@ -596,29 +523,24 @@ private class DiscordField(
 private fun PanelGroup(
     header: String? = null,
     footer: String? = null,
-    /** Keeps its box on a page too — the preview, which is a picture of a card. */
-    boxed: Boolean = false,
     content: @Composable () -> Unit,
 ) {
-    val page = LocalDesktopPanelIsPage.current
-    Column(Modifier.fillMaxWidth().padding(horizontal = panelInset(16.dp))) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         header?.let {
             Text(
                 it.uppercase(Locale.ROOT),
                 style = MaterialTheme.typography.labelSmall,
                 color = DesktopSecondary,
-                modifier = Modifier.padding(start = panelInset(6.dp), top = 14.dp, bottom = 6.dp),
+                modifier = Modifier.padding(start = 6.dp, top = 14.dp, bottom = 6.dp),
             )
         }
-        Column(
-            if (page && !boxed) Modifier.fillMaxWidth() else Modifier.fillMaxWidth().desktopCardInset(RoundedCornerShape(12.dp)),
-        ) { content() }
+        Column(Modifier.fillMaxWidth().desktopCardInset(RoundedCornerShape(12.dp))) { content() }
         footer?.let {
             Text(
                 it,
                 style = MaterialTheme.typography.bodySmall,
                 color = DesktopSecondary,
-                modifier = Modifier.padding(start = panelInset(6.dp), end = panelInset(6.dp), top = 6.dp),
+                modifier = Modifier.padding(start = 6.dp, end = 6.dp, top = 6.dp),
             )
         }
     }
@@ -636,8 +558,8 @@ private fun PanelSwitchRow(
     Row(
         Modifier
             .fillMaxWidth()
-            .desktopRowClickable(enabled = enabled) { onClick?.invoke() ?: onCheckedChange(!checked) }
-            .padding(horizontal = panelInset(14.dp), vertical = 11.dp),
+            .clickable(enabled = enabled) { onClick?.invoke() ?: onCheckedChange(!checked) }
+            .padding(horizontal = 14.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
@@ -654,7 +576,7 @@ private fun PanelSwitchRow(
 @Composable
 private fun PanelValueRow(title: String, value: String, onClick: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().desktopRowClickable(onClick = onClick).padding(horizontal = panelInset(14.dp), vertical = 13.dp),
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 13.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(title, color = Color.White, modifier = Modifier.weight(1f))
@@ -665,7 +587,7 @@ private fun PanelValueRow(title: String, value: String, onClick: () -> Unit) {
 @Composable
 private fun PanelActionRow(title: String, subtitle: String, destructive: Boolean, onClick: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().desktopRowClickable(onClick = onClick).padding(horizontal = panelInset(14.dp), vertical = 11.dp),
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
@@ -685,7 +607,7 @@ private fun PanelSliderRow(
     steps: Int,
     onValueChange: (Float) -> Unit,
 ) {
-    Column(Modifier.fillMaxWidth().padding(horizontal = panelInset(14.dp), vertical = 9.dp)) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 9.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(title, color = Color.White)
@@ -713,7 +635,7 @@ internal fun DesktopChoiceDialog(
     onSelect: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    DesktopDialogPanel(onDismiss = onDismiss, maxWidth = 380, popup = true) {
+    DesktopDialogPanel(onDismiss = onDismiss, maxWidth = 380) {
         Column(
             Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 18.dp),
             horizontalAlignment = Alignment.CenterHorizontally,

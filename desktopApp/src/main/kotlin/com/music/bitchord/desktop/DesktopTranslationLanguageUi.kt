@@ -1,8 +1,5 @@
 package com.music.bitchord.desktop
 
-import com.music.bitchord.data.lyrics.TRANSLATION_LANGUAGES
-import com.music.bitchord.data.lyrics.translationLanguageName
-
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -11,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -51,8 +49,8 @@ internal fun DesktopTranslationLanguageDialog(onDismiss: () -> Unit) {
     // Named in the reader's own language, and sorted that way too — the table's own order is
     // alphabetical by English name, which is not alphabetical once localised.
     val named = remember(locale) {
-        TRANSLATION_LANGUAGES
-            .map { it.code to translationLanguageName(it.code, locale) }
+        DESKTOP_TRANSLATION_LANGUAGES
+            .map { it.code to desktopTranslationLanguageName(it.code, locale) }
             .sortedBy { it.second.lowercase(locale) }
     }
     val shown = remember(named, filter) {
@@ -61,7 +59,7 @@ internal fun DesktopTranslationLanguageDialog(onDismiss: () -> Unit) {
     }
 
     DesktopDialogPanel(onDismiss = onDismiss, maxWidth = 420) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = panelInset(20.dp), vertical = 18.dp)) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 18.dp)) {
             Text(
                 DesktopStrings["translation_language", "Translation language"],
                 style = MaterialTheme.typography.titleLarge,
@@ -74,7 +72,7 @@ internal fun DesktopTranslationLanguageDialog(onDismiss: () -> Unit) {
             )
         }
 
-        Box(Modifier.fillMaxWidth().padding(horizontal = panelInset(20.dp))) {
+        Box(Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
             DesktopSearchField(
                 query = filter,
                 onQueryChange = { filter = it },
@@ -84,13 +82,13 @@ internal fun DesktopTranslationLanguageDialog(onDismiss: () -> Unit) {
         }
 
         LazyColumn(
-            Modifier.fillMaxWidth().then(desktopPanelBody(cardMax = 340.dp)).padding(top = 12.dp),
+            Modifier.fillMaxWidth().heightIn(max = 340.dp).padding(top = 12.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             item {
                 LanguageRow(
                     name = DesktopStrings["d_follow_the_app_language", "Follow the app language"],
-                    detail = translationLanguageName(DesktopStrings.resolvedTag(), locale),
+                    detail = desktopTranslationLanguageName(DesktopStrings.resolvedTag(), locale),
                     selected = stored.isBlank(),
                     onClick = { DesktopTranslationSetting.set("") },
                 )
@@ -105,7 +103,7 @@ internal fun DesktopTranslationLanguageDialog(onDismiss: () -> Unit) {
             }
         }
 
-        Row(Modifier.fillMaxWidth().padding(horizontal = panelInset(20.dp), vertical = 14.dp)) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 14.dp)) {
             Spacer(Modifier.weight(1f))
             TextButton(onClick = onDismiss) { Text(DesktopStrings["done", "Done"], color = Color.White) }
         }
@@ -117,13 +115,9 @@ private fun LanguageRow(name: String, detail: String, selected: Boolean, onClick
     Row(
         Modifier
             .fillMaxWidth()
-            .desktopRowClickable(onClick = onClick)
-            // On a page the row's text sits on the gutter, where a band would have no edge to it;
-            // the tick says which is chosen.
-            .background(
-                if (selected && !LocalDesktopPanelIsPage.current) Color.White.copy(alpha = 0.06f) else Color.Transparent,
-            )
-            .padding(horizontal = panelInset(20.dp), vertical = 10.dp),
+            .clickable(onClick = onClick)
+            .background(if (selected) Color.White.copy(alpha = 0.06f) else Color.Transparent)
+            .padding(horizontal = 20.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {

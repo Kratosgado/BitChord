@@ -1,7 +1,5 @@
 package com.music.bitchord.desktop
 
-import com.music.bitchord.data.innertube.Innertube
-import com.music.bitchord.data.innertube.StreamResolver
 import java.security.MessageDigest
 import java.util.Locale
 
@@ -38,12 +36,6 @@ internal object DesktopYouTubeAuth {
     fun adopt(value: Session?) {
         if (session == value) return
         session = value
-        // The YouTube Music client is the phone's, shared; it signs with this
-        // cookie and addresses this channel.
-        Innertube.cookie = value?.cookie
-        Innertube.selectChannel(value?.pageId, value?.dataSyncId, value?.authUser)
-        // A new session means a new player config and PoToken binding, as on the phone.
-        StreamResolver.onSessionChanged()
         DesktopTrackLog.log(
             if (value == null) {
                 "youtube: signed out; requests are anonymous again"

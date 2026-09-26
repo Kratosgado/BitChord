@@ -6,6 +6,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.Job
 import java.util.concurrent.ConcurrentHashMap
+import java.net.HttpURLConnection
 import java.net.URI
 import java.nio.file.Files
 import java.nio.file.Path
@@ -26,7 +27,7 @@ object DesktopDownloadManager {
         if (job != null) activeJobs[song.videoId] = job
         return try {
             require(song.localPath == null) { "This track is already local" }
-            val stream = DesktopMusicSources.resolve(song, quality, forDownload = true).getOrThrow()
+            val stream = DesktopMusicSources.resolve(song, quality).getOrThrow()
             val directory = Path.of(System.getProperty("user.home"), "Music", "BitChord")
             Files.createDirectories(directory)
             val safeName = buildString {
@@ -34,50 +35,31 @@ object DesktopDownloadManager {
                 append(" - ")
                 append(song.title)
             }.replace(ILLEGAL_FILENAME, "_").trim().take(180).ifBlank { song.videoId }
-            // A manifest is an index of the audio, not the audio: fetched as a file it saved a few
-            // KB of XML as `.flac`. Its segments are fMP4, so it can only become FLAC or M4A.
-            val manifest = DesktopManifestDownload.isManifest(stream)
-            val extension = stream.format.fileExtension().let { if (manifest && it != "flac") "m4a" else it }
+            val extension = stream.format.fileExtension()
             val target = directory.resolve("$safeName.$extension")
             val temporary = directory.resolve(".$safeName.$extension.part")
             if (Files.isRegularFile(target) && Files.size(target) > 0L) {
                 return Result.success(song.copy(localUri = target.toUri().toString(), localPath = target.toString()))
             }
 
-            if (manifest) {
-                // Segments are fetched and joined whole, so there is no partial file to resume.
-                Files.deleteIfExists(temporary)
-                Files.newOutputStream(temporary).buffered().use { output ->
-                    DesktopManifestDownload.save(
-                        stream,
-                        extension,
-                        output,
-                        tempDir = java.io.File(System.getProperty("java.io.tmpdir")),
-                        userAgent = DOWNLOAD_USER_AGENT,
-                    ) { done, total -> onProgress(done, total) }
-                }
-                check(Files.size(temporary) > 0L) { "Download failed: nothing was sent" }
-                Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING)
-                return Result.success(song.copy(localUri = target.toUri().toString(), localPath = target.toString()))
-            }
-
             val existing = if (Files.isRegularFile(temporary)) Files.size(temporary) else 0L
-            val request = DesktopDownloadHttp.request(
-                stream.url,
-                DOWNLOAD_USER_AGENT,
-                stream.headers,
-                rangeFrom = existing.takeIf { it > 0L },
-            )
-            DesktopDownloadHttp.client.newCall(request).execute().use { response ->
-                check(response.isSuccessful) { "Download failed (HTTP ${response.code})" }
-                val body = response.body
-                val append = existing > 0L && response.code == HTTP_PARTIAL
+            val connection = URI(stream.url).toURL().openConnection() as? HttpURLConnection
+                ?: error("Downloads require an HTTP audio stream")
+            connection.connectTimeout = CONNECT_TIMEOUT_MS
+            connection.readTimeout = READ_TIMEOUT_MS
+            connection.setRequestProperty("User-Agent", DOWNLOAD_USER_AGENT)
+            stream.headers.forEach { (name, value) -> connection.setRequestProperty(name, value) }
+            if (existing > 0L) connection.setRequestProperty("Range", "bytes=$existing-")
+            try {
+                val status = connection.responseCode
+                check(status in 200..299) { "Download failed (HTTP $status)" }
+                val append = existing > 0L && status == HttpURLConnection.HTTP_PARTIAL
                 val offset = if (append) existing else 0L
-                val total = response.header("Content-Range")
+                val total = connection.getHeaderField("Content-Range")
                     ?.substringAfterLast('/')
                     ?.toLongOrNull()
                     ?.takeIf { it > 0L }
-                    ?: body.contentLength().takeIf { it > 0L }?.let { it + offset }
+                    ?: connection.contentLengthLong.takeIf { it > 0L }?.let { it + offset }
                 if (!append && existing > 0L) Files.deleteIfExists(temporary)
                 Files.newOutputStream(
                     temporary,
@@ -85,7 +67,7 @@ object DesktopDownloadManager {
                     StandardOpenOption.WRITE,
                     if (append) StandardOpenOption.APPEND else StandardOpenOption.TRUNCATE_EXISTING,
                 ).use { output ->
-                    body.byteStream().use { input ->
+                    connection.inputStream.use { input ->
                         val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
                         var downloaded = offset
                         onProgress(downloaded, total)
@@ -100,6 +82,8 @@ object DesktopDownloadManager {
                         }
                     }
                 }
+            } finally {
+                connection.disconnect()
             }
             check(Files.size(temporary) > 0L) { "Download failed: nothing was sent" }
             runCatching {
@@ -171,7 +155,8 @@ object DesktopDownloadManager {
         }
     }
 
-    private const val HTTP_PARTIAL = 206
+    private const val CONNECT_TIMEOUT_MS = 20_000
+    private const val READ_TIMEOUT_MS = 30_000
     private const val DOWNLOAD_USER_AGENT =
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
             "(KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36"

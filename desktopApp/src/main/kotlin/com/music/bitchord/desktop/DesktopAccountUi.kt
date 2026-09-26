@@ -22,14 +22,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.ManageAccounts
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -62,10 +60,7 @@ internal fun DesktopAccountButton(
     onClick: () -> Unit,
 ) {
     Box(
-        // Rests at the toolbar buttons' hover wash and brightens a step when pointed at.
-        Modifier.size(36.dp).clip(CircleShape)
-            .desktopHoverWash(restAlpha = 0.12f, hoverAlpha = 0.2f)
-            .clickable(onClick = onClick),
+        Modifier.size(36.dp).clip(CircleShape).clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         if (avatar != null) {
@@ -272,15 +267,9 @@ private fun DesktopSelectorAction(
     }
 }
 
-/** What [DesktopSignInDialog]'s `busy` holds while the in-app sign-in window is open. */
-internal const val WEB_SIGN_IN = "Google"
-
-/** Signing in: Google's own page in a BitChord window, a browser to take the session from, or the cookie by hand. */
+/** Signing in: a browser to take the session from, or the cookie by hand. */
 @Composable
 internal fun DesktopSignInDialog(
-    /** Whether the in-app sign-in window can be shown; see [DesktopWebSignIn]. */
-    webSignIn: Boolean,
-    onWebSignIn: () -> Unit,
     onImport: (DesktopBrowserCookies.Profile) -> Unit,
     onPaste: (String) -> Unit,
     busy: String?,
@@ -291,11 +280,7 @@ internal fun DesktopSignInDialog(
     var pasting by remember { mutableStateOf(false) }
     var pasted by remember { mutableStateOf("") }
     LaunchedEffect(Unit) {
-        profiles = withContext(Dispatchers.IO) {
-            DesktopBrowserCookies.profiles().filterNot {
-                DesktopPlatform.isWindows && it.family == DesktopBrowserCookies.Family.CHROMIUM
-            }
-        }
+        profiles = withContext(Dispatchers.IO) { DesktopBrowserCookies.profiles() }
     }
 
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -303,12 +288,10 @@ internal fun DesktopSignInDialog(
             Modifier
                 .fillMaxSize()
                 .background(Color.Black.copy(alpha = 0.5f))
-                // Swallows clicks without dismissing: leaving now would cancel a sign-in that is
-                // still open, so only the close button does that.
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
-                    onClick = {},
+                    onClick = onDismiss,
                 ),
         )
         val shape = RoundedCornerShape(20.dp)
@@ -320,31 +303,19 @@ internal fun DesktopSignInDialog(
                 .desktopBarGlass(shape)
                 .padding(bottom = 8.dp),
         ) {
-            Row(
-                Modifier.fillMaxWidth().padding(start = 22.dp, end = 10.dp, top = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    DesktopStrings["sign_in_youtube_music", "Sign in to YouTube Music"],
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color.White,
-                    modifier = Modifier.weight(1f).padding(top = 10.dp),
-                )
-                IconButton(onClick = onDismiss) {
-                    Icon(Icons.Rounded.Close, DesktopStrings["close", "Close"], tint = DesktopSecondary)
-                }
-            }
             Text(
-                if (webSignIn) {
-                    "Sign in with Google in a BitChord window, then choose \"Use this profile\"."
-                } else {
-                    DesktopStrings[
-                        "d_google_signs_in_inside_a_browser",
-                        "Google signs in inside a browser and hands back a session. Pick a browser " +
-                            "here that is already signed in and BitChord will use its session.",
-                    ]
-                },
+                DesktopStrings["sign_in_youtube_music", "Sign in to YouTube Music"],
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = Color.White,
+                modifier = Modifier.padding(start = 22.dp, end = 22.dp, top = 20.dp),
+            )
+            Text(
+                DesktopStrings[
+                    "d_google_signs_in_inside_a_browser",
+                    "Google signs in inside a browser and hands back a session. Pick a browser " +
+                        "here that is already signed in and BitChord will use its session.",
+                ],
                 style = MaterialTheme.typography.bodySmall,
                 color = DesktopSecondary,
                 modifier = Modifier.padding(start = 22.dp, end = 22.dp, top = 6.dp, bottom = 10.dp),
@@ -402,35 +373,7 @@ internal fun DesktopSignInDialog(
                 }
                 else -> LazyColumn(Modifier.heightIn(max = 320.dp)) {
                     val found = profiles.orEmpty()
-                    if (webSignIn) {
-                        item(key = "web-sign-in") {
-                            Row(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .heightIn(min = 62.dp)
-                                    .clickable(enabled = busy == null) { onWebSignIn() }
-                                    .padding(horizontal = 22.dp, vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Column(Modifier.weight(1f)) {
-                                    Text("Sign in with Google", color = Color.White)
-                                    Text(
-                                        if (busy == WEB_SIGN_IN) {
-                                            "Finish in the sign-in window, then choose \"Use this profile\""
-                                        } else {
-                                            "Opens Google's sign-in page in a BitChord window"
-                                        },
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = DesktopSecondary,
-                                    )
-                                }
-                                if (busy == WEB_SIGN_IN) {
-                                    CircularProgressIndicator(color = DesktopAccent, modifier = Modifier.size(14.dp))
-                                }
-                            }
-                        }
-                    }
-                    if (found.isEmpty() && !webSignIn) {
+                    if (found.isEmpty()) {
                         item {
                             Text(
                                 DesktopStrings["d_no_browser_profile_was_found_on_this_machine", "No browser profile was found on this machine."],
