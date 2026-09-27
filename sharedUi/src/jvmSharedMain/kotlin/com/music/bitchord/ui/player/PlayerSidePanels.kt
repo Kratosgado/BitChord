@@ -49,7 +49,7 @@ fun LyricsSidePanel(
 ) {
     val haptics = rememberHaptics()
     val lyricsOffsetMs by PlayerSettings.lyricsOffsetMs.collectAsStateWithLifecycle()
-    val lyricsPlayhead = rememberLyricPlayhead(position)
+    val lyricsPosition: () -> Long = { adjustedLyricsPosition(position.positionMs, lyricsOffsetMs) }
     val seekToLyric: (Long) -> Unit = { lineTimeMs ->
         onSeek(adjustedLyricsSeekTarget(lineTimeMs, lyricsOffsetMs))
     }
@@ -79,7 +79,7 @@ fun LyricsSidePanel(
                     lyricsLoadingText
                 },
                 status = lyricsTranslation.status,
-                onStatusClick = { showLyricsProviders = true },
+                onChangeProvider = { showLyricsProviders = true },
                 romanizationToggle = {
                     RomanizationToggleButton(
                         state = lyricsTranslation.romanizationState,
@@ -105,20 +105,22 @@ fun LyricsSidePanel(
                     // Controls always open, as in the landscape player: there
                     // is no transport hidden behind these lines for a tap to
                     // bring back.
-                    LyricsPanel(
-                        lines = lyrics.orEmpty(),
-                        subLines = lyricsTranslation.subLines,
-                        trackKey = song.videoId,
-                        playhead = lyricsPlayhead,
-                        looking = !lyricsUnavailable,
-                        isPlaying = isPlaying && position.advancing,
-                        onSeekToLine = seekToLyric,
-                        controlsOpen = true,
-                        onRevealControls = {},
-                        onHideControls = {},
-                        translationProgress = particleProgress,
-                        modifier = Modifier.fillMaxSize(),
-                    )
+                    PlaybackPositionScope(lyricsPosition) { lyricsPositionMs ->
+                        LyricsPanel(
+                            lines = lyrics.orEmpty(),
+                            subLines = lyricsTranslation.subLines,
+                            trackKey = song.videoId,
+                            positionMs = lyricsPositionMs,
+                            looking = !lyricsUnavailable,
+                            isPlaying = isPlaying,
+                            onSeekToLine = seekToLyric,
+                            controlsOpen = true,
+                            onRevealControls = {},
+                            onHideControls = {},
+                            translationProgress = particleProgress,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
                 }
             }
         }
