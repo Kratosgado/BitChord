@@ -528,6 +528,15 @@
     <string name="song_added_to_queue">Song added to queue</string>
     <string name="song_added_to_playlist">Added to playlist</string>
     <string name="song_already_in_playlist">Already in playlist</string>
+    <plurals name="songs_added_to_playlist">
+        <item quantity="one">Added %1$d song to the playlist</item>
+        <item quantity="other">Added %1$d songs to the playlist</item>
+    </plurals>
+    <plurals name="songs_already_in_playlist">
+        <item quantity="one">%1$d song already in the playlist</item>
+        <item quantity="other">%1$d songs already in the playlist</item>
+    </plurals>
+    <string name="all_songs_already_in_playlist">All tracks are already in the playlist</string>
     <string name="party_queue_full">Queue is full (maximum %d songs in party)</string>
     <plurals name="log_copied_line_count">
         <item quantity="one">Log copied · %1$d line</item>
