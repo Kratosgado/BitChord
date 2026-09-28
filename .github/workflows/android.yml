@@ -5,6 +5,9 @@ on:
     tags: ["v*.*.*"]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build-prod-release:
     runs-on: ubuntu-latest
@@ -39,8 +42,27 @@ jobs:
     - name: Build Signed Prod Release APK
       run: ./gradlew assembleProdRelease
 
+    - name: Stage APK with a versioned name
+      id: stage
+      run: |
+        version="${GITHUB_REF_NAME#v}"
+        mkdir -p dist
+        cp app/build/outputs/apk/prod/release/*.apk "dist/BitChord-${version}-android.apk"
+        echo "path=dist/BitChord-${version}-android.apk" >> "$GITHUB_OUTPUT"
+
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
       with:
         name: bitchord-prod-release-signed
-        path: app/build/outputs/apk/prod/release/*.apk
+        path: ${{ steps.stage.outputs.path }}
+
+    - name: Attach APK to the draft release
+      if: github.ref_type == 'tag'
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ github.ref_name }}
+        name: BitChord ${{ github.ref_name }}
+        draft: true
+        files: ${{ steps.stage.outputs.path }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
