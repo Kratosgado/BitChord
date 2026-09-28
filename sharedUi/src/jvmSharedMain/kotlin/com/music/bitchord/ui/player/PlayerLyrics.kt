@@ -2219,6 +2219,13 @@ private fun String.stripParens(): String = replace("(", "").replace(")", "").tri
  * Transitions between lines use [AnimatedContent] with vertical slide and
  * fade, respecting [PlayerSettings.reduceAnimation].
  */
+private data class LyricStripState(
+    val index: Int,
+    val current: LyricLine?,
+    val text: String,
+    val next: String,
+)
+
 @Composable
 private fun CurrentLyricLine(
     lines: List<LyricLine>,
@@ -2293,6 +2300,14 @@ private fun CurrentLyricLine(
         instrumental -> stringResource(Res.string.instrumental)
         else -> current.text
     }
+    // Gaps are skipped: an instrumental beat is not something to preview.
+    // Empty when there is no next line, so the strip keeps its two-line
+    // height rather than pushing the controls when it fills or empties.
+    val nextIndex = remember(lines, index) {
+        if (index < 0) firstSung
+        else ((index + 1) until lines.size).firstOrNull { !lines[it].isGap } ?: -1
+    }
+    val nextText = lines.getOrNull(nextIndex)?.text.orEmpty()
 
     val reduceAnimation by PlayerSettings.reduceAnimation.collectAsStateWithLifecycle()
 
@@ -2313,7 +2328,7 @@ private fun CurrentLyricLine(
             Spacer(Modifier.width(6.dp))
         }
         AnimatedContent(
-            targetState = Triple(index, current, text),
+            targetState = LyricStripState(index, current, text, nextText),
             transitionSpec = {
                 val duration = if (reduceAnimation) 0 else 340
                 if (reduceAnimation) {
@@ -2333,24 +2348,34 @@ private fun CurrentLyricLine(
             },
             label = "currentLyricTransition",
             modifier = Modifier.weight(1f, fill = false),
-        ) { (_, lineItem, lineText) ->
+        ) { state ->
+            val lineItem = state.current
             val itemInstrumental = lineItem == null || lineItem.isGap
             val swept = lineItem?.takeIf { !itemInstrumental && it.isWordSynced }
-            if (swept != null) {
-                SweptLyricLine(
-                    line = swept,
-                    clock = clock,
-                    style = MaterialTheme.typography.titleMedium,
-                    dimAlpha = UNSUNG_ALPHA_STRIP,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    rise = false,
-                )
-            } else {
+            Column {
+                if (swept != null) {
+                    SweptLyricLine(
+                        line = swept,
+                        clock = clock,
+                        style = MaterialTheme.typography.titleMedium,
+                        dimAlpha = UNSUNG_ALPHA_STRIP,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        rise = false,
+                    )
+                } else {
+                    Text(
+                        text = state.text,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = if (itemInstrumental) Color.White.copy(alpha = 0.5f) else Color.White,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
                 Text(
-                    text = lineText,
+                    text = state.next,
                     style = MaterialTheme.typography.titleMedium,
-                    color = if (itemInstrumental) Color.White.copy(alpha = 0.5f) else Color.White,
+                    color = Color.White.copy(alpha = 0.5f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
