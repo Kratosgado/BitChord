@@ -10,6 +10,9 @@ permissions:
 
 jobs:
   update-contributors:
+    # Upstream only: on a fork this would rewrite MAINTAINERS.md with the fork's
+    # own contributor list and commit it, which is not wanted.
+    if: github.repository == 'kushagrasinghx/BitChord'
     runs-on: ubuntu-latest
 
     steps:
