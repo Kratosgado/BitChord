@@ -12,6 +12,10 @@ concurrency:
 
 jobs:
   test:
+    # Only ever runs on the upstream repo. This deploys to the maintainer's
+    # Oracle VM over SSH with secrets a fork does not have, so it is scoped to
+    # the source repo to keep forks from failing (or worse, trying to reach it).
+    if: github.repository == 'kushagrasinghx/BitChord'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
