@@ -5,6 +5,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
 import org.junit.Test
 
 class GeniusTest {
@@ -109,6 +110,13 @@ class GeniusTest {
 
     @Test
     fun `live genius search and scraping test with noisy titles`() = kotlinx.coroutines.runBlocking {
+        // Hits genius.com — not something CI should depend on. Skipped
+        // unless the caller opts in with RUN_LIVE_TESTS=1, so a Genius
+        // outage or a re-scored search result never reddens the build.
+        assumeTrue(
+            "Skip live network test; set RUN_LIVE_TESTS=1 to run it.",
+            System.getenv("RUN_LIVE_TESTS") == "1",
+        )
         println("--- TEST 1: Queen - Bohemian Rhapsody (Official Video) ---")
         val lyrics1 = Genius.lyrics("Bohemian Rhapsody (Official Video)", "Queen")
         assertNotNull(lyrics1)
