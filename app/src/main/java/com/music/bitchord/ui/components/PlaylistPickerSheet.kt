@@ -23,7 +23,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.Lock
@@ -67,6 +67,19 @@ import com.music.bitchord.ui.icons.BitChordIcons
 import java.util.Locale
 
 /**
+ * What the picker is currently adding to a playlist: a single track, or a
+ * whole release (an album or a user playlist).
+ *
+ * A sealed shape rather than two nullable parameters, so the head of the sheet
+ * and the header the row is described with can never disagree about which of
+ * the two it is drawing.
+ */
+sealed interface PickerTarget {
+    data class Track(val song: Song) : PickerTarget
+    data class Release(val target: BrowseTarget) : PickerTarget
+}
+
+/**
  * Where a track goes: one of the account's playlists, or a new one.
  *
  * Two panels in one sheet rather than a sheet that opens a dialog. Creating a
@@ -75,13 +88,17 @@ import java.util.Locale
  * carries the track with it instead of leaving a new empty playlist behind
  * for the user to add to a second time.
  *
- * [song] is null when the flow started from the Library tab rather than from a
- * track, which is the one case where the header has no track to draw and
- * "New playlist" is the whole point of the sheet.
+ * [target] is null when the flow started from the Library tab rather than
+ * from a track or release, which is the one case where the header has
+ * nothing to draw and "New playlist" is the whole point of the sheet.
  *
- * Playlists are ticked rather than picked: one track often belongs in more
- * than one list, and a sheet that closed on the first tap meant opening it
- * again for each. [onAdd] gets every ticked playlist at once.
+ * [containingPlaylistIds] is the set of playlist ids that already hold the
+ * target — a track that has already been added to one of the account's
+ * playlists is drawn with a check, so the sheet can act as the answer to
+ * "which of these is it on" as much as the way to add it to another. For a
+ * release target it is the playlists that already hold every track of the
+ * release; the picker doesn't attempt a "some tracks are on it" state,
+ * which reads as neither yes nor no.
  */
 @Composable
 fun PlaylistPickerSheet(
@@ -90,7 +107,8 @@ fun PlaylistPickerSheet(
     onAdd: (List<UserPlaylist>) -> Unit,
     onCreate: (String, PlaylistPrivacy) -> Unit,
     modifier: Modifier = Modifier,
-    song: Song? = null,
+    target: PickerTarget? = null,
+    containingPlaylistIds: Set<String> = emptySet(),
     startCreating: Boolean = false,
 ) {
     var creating by remember { mutableStateOf(startCreating) }
@@ -110,12 +128,19 @@ fun PlaylistPickerSheet(
     }
 
     Column(modifier.fillMaxWidth()) {
-        if (song != null) {
-            SheetTrackHeader(song)
-            HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outline)
+        when (target) {
+            is PickerTarget.Track -> {
+                SheetTrackHeader(target.song)
+                HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outline)
+            }
+            is PickerTarget.Release -> {
+                BrowseSheetHeader(target.target)
+                HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outline)
+            }
+            null -> Unit
         }
         SheetHeading(
-            stringResource(if (song != null) R.string.add_to_playlist else R.string.your_playlists)
+            stringResource(if (target != null) R.string.add_to_playlist else R.string.your_playlists)
                 .uppercase(Locale.getDefault()),
         )
 
@@ -157,13 +182,10 @@ fun PlaylistPickerSheet(
                 // it scrolls inside the sheet instead.
                 LazyColumn(Modifier.heightIn(max = 320.dp)) {
                     items(playlists, key = { it.playlistId }) { playlist ->
-                        val ticked = playlist.playlistId in selected
                         PlaylistRow(
                             playlist = playlist,
-                            selected = ticked,
-                            onClick = {
-                                selected = if (ticked) selected - playlist.playlistId else selected + playlist.playlistId
-                            },
+                            contained = playlist.playlistId in containingPlaylistIds,
+                            onClick = { onPick(playlist) },
                         )
                     }
                 }
@@ -190,7 +212,7 @@ fun PlaylistPickerSheet(
 }
 
 @Composable
-private fun PlaylistRow(playlist: UserPlaylist, selected: Boolean, onClick: () -> Unit) {
+private fun PlaylistRow(playlist: UserPlaylist, contained: Boolean, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -226,13 +248,19 @@ private fun PlaylistRow(playlist: UserPlaylist, selected: Boolean, onClick: () -
                 )
             }
         }
-        Spacer(Modifier.width(12.dp))
-        Icon(
-            imageVector = if (selected) Icons.Rounded.CheckCircle else Icons.Rounded.RadioButtonUnchecked,
-            contentDescription = null,
-            tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(24.dp),
-        )
+        if (contained) {
+            // Same "not yet / done" vocabulary the release header uses, so the
+            // sheet reads as a list of destinations and their state. Tapping a
+            // checked row is still live: the ViewModel treats a duplicate add
+            // as a no-op and the caller shows an "already in playlist" notice.
+            Spacer(Modifier.width(12.dp))
+            Icon(
+                imageVector = Icons.Rounded.Check,
+                contentDescription = stringResource(R.string.song_already_in_playlist),
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp),
+            )
+        }
     }
 }
 

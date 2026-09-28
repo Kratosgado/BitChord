@@ -139,6 +139,14 @@ fun BrowseActionsSheet(
     onShuffle: (() -> Unit)? = null,
     /** Null where the sheet was opened from the page it would navigate to. */
     onOpen: (() -> Unit)? = null,
+    /**
+     * Adds every track of this release to one of the account's playlists —
+     * the collection-level counterpart to the row on [SongActionsSheet]. Null
+     * for anything with no tracks to pipe: an artist card, and any target
+     * whose [BrowseTarget.type] isn't [BrowseType.ALBUM] or
+     * [BrowseType.PLAYLIST].
+     */
+    onAddToPlaylist: (() -> Unit)? = null,
     onDownloadAll: (() -> Unit)? = null,
     /**
      * Shares the release's own YouTube Music link — the album/playlist
@@ -327,7 +335,7 @@ fun BrowseActionsSheet(
 
 /** Which release the sheet is about: the same row the shelf card was. */
 @Composable
-private fun BrowseSheetHeader(target: BrowseTarget) {
+internal fun BrowseSheetHeader(target: BrowseTarget) {
     val shape = if (target.type == BrowseType.ARTIST) CircleShape else RoundedCornerShape(8.dp)
     Row(
         modifier = Modifier

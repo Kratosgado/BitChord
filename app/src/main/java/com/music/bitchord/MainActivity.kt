@@ -219,6 +219,7 @@ import com.music.bitchord.ui.components.BrowseActionsSheet
 import com.music.bitchord.ui.components.BrowseTarget
 import com.music.bitchord.ui.components.ConfirmationAlert
 import com.music.bitchord.ui.components.DownloadManagerSheet
+import com.music.bitchord.ui.components.PickerTarget
 import com.music.bitchord.ui.components.PlaylistPickerSheet
 import com.music.bitchord.ui.components.ReorderPlaylistSheet
 import com.music.bitchord.ui.components.LongPressOrigin
@@ -656,6 +657,16 @@ private fun BitChordApp(
     // Separate from [songActions] so the menu can close behind it — the picker
     // is the next step, not a second sheet stacked on the first.
     var playlistTarget by remember { mutableStateOf<Song?>(null) }
+    // Same slot for the album/playlist path: the picker's release-header
+    // variant, adding every track of a release to a playlist in one request.
+    // Held separately so the two flows can never open the sheet on top of
+    // each other and disagree about what is being added.
+    var playlistBrowseTarget by remember { mutableStateOf<BrowseTarget?>(null) }
+    // Songs already resolved for the browse target — the same list
+    // [withBrowseSongs] hands off, held onto so a network hiccup between
+    // opening the picker and picking a playlist doesn't cost the user the
+    // second round-trip they already paid for.
+    var playlistBrowseSongs by remember { mutableStateOf<List<Song>>(emptyList()) }
     // The picker opened from the Library tab, where there is no track and
     // creating the playlist is the whole errand.
     var creatingPlaylist by remember { mutableStateOf(false) }
@@ -4581,11 +4592,48 @@ private fun BitChordApp(
         // One sheet for both, because they are one decision: the list of
         // playlists with a way to make another. `creatingPlaylist` opens it
         // straight onto the form, which is what the Library tile means.
-        if (playlistTarget != null || creatingPlaylist) {
-            val target = playlistTarget
+        //
+        // Two sources feed it: a single track from a song action menu, and a
+        // whole release from a release action menu. Only one is ever set at
+        // a time (see the block that raises the release variant, which
+        // resolves songs first, then opens the sheet).
+        if (playlistTarget != null || playlistBrowseTarget != null || creatingPlaylist) {
+            val trackTarget = playlistTarget
+            val releaseTarget = playlistBrowseTarget
+            val pickerTarget = when {
+                trackTarget != null -> PickerTarget.Track(trackTarget)
+                releaseTarget != null -> PickerTarget.Release(releaseTarget)
+                else -> null
+            }
             val dismiss = {
                 playlistTarget = null
+                playlistBrowseTarget = null
+                playlistBrowseSongs = emptyList()
                 creatingPlaylist = false
+            }
+            // Kick off a one-shot membership fetch so the picker rows can wear
+            // their check icon by the time the user has finished reading the
+            // list. Cheap on a re-open — the cache is remembered for the
+            // session.
+            LaunchedEffect(playlists.size, trackTarget?.videoId, releaseTarget?.browseId) {
+                if (pickerTarget != null) viewModel.preloadPlaylistMembership(playlists)
+            }
+            val playlistSongs by viewModel.playlistSongs.collectAsStateWithLifecycle()
+            val containing: Set<String> = remember(playlistSongs, trackTarget, releaseTarget, playlistBrowseSongs) {
+                when {
+                    trackTarget != null -> playlistSongs.entries
+                        .asSequence()
+                        .filter { trackTarget.videoId in it.value }
+                        .mapTo(HashSet()) { it.key }
+                    releaseTarget != null && playlistBrowseSongs.isNotEmpty() -> {
+                        val ids = playlistBrowseSongs.map { it.videoId }
+                        playlistSongs.entries
+                            .asSequence()
+                            .filter { (_, set) -> ids.all { it in set } }
+                            .mapTo(HashSet()) { it.key }
+                    }
+                    else -> emptySet()
+                }
             }
             ModalBottomSheet(
                 onDismissRequest = dismiss,
@@ -4594,32 +4642,58 @@ private fun BitChordApp(
                 PlaylistPickerSheet(
                     playlists = playlists,
                     loading = playlistsLoading,
-                    song = target,
-                    startCreating = target == null,
-                    onAdd = { picked ->
-                        target?.let { song ->
-                            viewModel.addToPlaylists(picked, song) { added, alreadyThere, failed ->
-                                // One line for the whole batch, saying the
-                                // outcome that matters most: what went in, else
-                                // that it was all there already, else that it
-                                // didn't work.
-                                showQueueNotice(
-                                    when {
-                                        added > 1 -> context.resources.getQuantityString(
-                                            R.plurals.added_to_playlists_notice, added, added,
-                                        )
-                                        added == 1 -> context.getString(R.string.song_added_to_playlist)
-                                        alreadyThere > 0 && failed == 0 ->
-                                            context.getString(R.string.song_already_in_playlist)
-                                        else -> context.getString(R.string.failed)
-                                    },
-                                )
+                    target = pickerTarget,
+                    containingPlaylistIds = containing,
+                    startCreating = pickerTarget == null,
+                    onPick = { playlist ->
+                        when {
+                            trackTarget != null -> {
+                                viewModel.addToPlaylist(playlist, trackTarget) { alreadyInPlaylist ->
+                                    showQueueNotice(
+                                        context.getString(
+                                            if (alreadyInPlaylist) R.string.song_already_in_playlist
+                                            else R.string.song_added_to_playlist,
+                                        ),
+                                    )
+                                }
+                                // The sheet stays up — adding to more than one
+                                // playlist is one motion now, not one motion
+                                // repeated.
                             }
+                            releaseTarget != null -> {
+                                val songs = playlistBrowseSongs
+                                if (songs.isEmpty()) {
+                                    showQueueNotice(context.getString(R.string.no_tracks_here))
+                                } else {
+                                    viewModel.addSongsToPlaylist(playlist, songs) { added, duplicates ->
+                                        val message = when {
+                                            added == 0 && duplicates == songs.size ->
+                                                context.getString(R.string.all_songs_already_in_playlist)
+                                            added == 0 ->
+                                                context.getString(R.string.song_already_in_playlist)
+                                            duplicates == 0 -> context.resources.getQuantityString(
+                                                R.plurals.songs_added_to_playlist, added, added,
+                                            )
+                                            else -> context.resources.getQuantityString(
+                                                R.plurals.songs_added_to_playlist, added, added,
+                                            ) + " · " + context.resources.getQuantityString(
+                                                R.plurals.songs_already_in_playlist, duplicates, duplicates,
+                                            )
+                                        }
+                                        showQueueNotice(message)
+                                    }
+                                }
+                            }
+                            else -> Unit
                         }
-                        dismiss()
                     },
                     onCreate = { title, privacy ->
-                        viewModel.createPlaylist(title, privacy, target)
+                        // For a release, the new playlist is seeded via a
+                        // second call once the id lands — the create endpoint
+                        // takes a videoIds list, but wiring it through the
+                        // Song-shaped seed here is more churn than it earns
+                        // for a rarely-used path.
+                        viewModel.createPlaylist(title, privacy, trackTarget)
                         dismiss()
                     },
                 )

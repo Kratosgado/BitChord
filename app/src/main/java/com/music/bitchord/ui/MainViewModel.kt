@@ -882,6 +882,58 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val _playlistsLoading = MutableStateFlow(false)
     val playlistsLoading: StateFlow<Boolean> = _playlistsLoading.asStateFlow()
 
+    /**
+     * Which of the account's playlists hold which tracks — keyed by playlist
+     * id, valued by the set of videoIds on it. Populated lazily by
+     * [preloadPlaylistMembership] the first time the picker opens against a
+     * playlist, and mutated in place by [addSongsToPlaylist] on success so a
+     * just-added row's check appears without a re-fetch. Not persisted: a new
+     * session pays the round trip again, and neither does it need to.
+     */
+    private val _playlistSongs = MutableStateFlow<Map<String, Set<String>>>(emptyMap())
+    val playlistSongs: StateFlow<Map<String, Set<String>>> = _playlistSongs.asStateFlow()
+
+    /**
+     * Fetches every playlist's track list once, so the picker can mark the
+     * rows the current target already sits on. Cheap for playlists whose page
+     * is already open ([_detailStack] seeds them without a request), a
+     * capped fan-out otherwise so a shelf of dozens can't fire dozens of
+     * requests at once.
+     */
+    fun preloadPlaylistMembership(playlists: List<UserPlaylist>) {
+        if (!_signedIn.value) return
+        val cache = _playlistSongs.value
+        val missing = playlists.filter { it.playlistId !in cache && it.browseId != null }
+        if (missing.isEmpty()) return
+        // Seed from any playlist page already loaded, so the picker doesn't
+        // ask for what the app already has.
+        val seeded = _playlistSongs.value.toMutableMap()
+        for (playlist in missing) {
+            val id = playlist.browseId ?: continue
+            val open = (_detailStack.value.firstOrNull { it.browseId == id }?.songs as? UiState.Success)?.data
+            if (open != null) seeded[playlist.playlistId] = open.mapTo(HashSet()) { it.videoId }
+        }
+        _playlistSongs.value = seeded
+        val toFetch = missing.filter { it.playlistId !in seeded }
+        if (toFetch.isEmpty()) return
+        viewModelScope.launch {
+            val limiter = Semaphore(3)
+            coroutineScope {
+                toFetch.forEach { playlist ->
+                    val browseId = playlist.browseId ?: return@forEach
+                    launch {
+                        val songs = limiter.withPermit {
+                            YtMusicRepository.allSongs(browseId).getOrNull()
+                        } ?: return@launch
+                        _playlistSongs.value = _playlistSongs.value.toMutableMap().apply {
+                            put(playlist.playlistId, songs.mapTo(HashSet()) { it.videoId })
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     /** Re-fetched rather than cached for the session: playlists are edited here. */
     fun loadPlaylists() {
         if (!_signedIn.value || _playlistsLoading.value) return
