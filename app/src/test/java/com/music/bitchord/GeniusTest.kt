@@ -110,11 +110,13 @@ class GeniusTest {
 
     @Test
     fun `live genius search and scraping test with noisy titles`() = kotlinx.coroutines.runBlocking {
-        // Scrapes the real genius.com, which answers a CI runner's datacenter address
-        // with a block or a rate limit (Genius.lyrics turns that into null), so it
-        // would fail the build for reasons that have nothing to do with the code.
-        // Run it by hand with LIVE_TESTS=1.
-        assumeTrue("needs the network; set LIVE_TESTS=1", System.getenv("LIVE_TESTS") == "1")
+        // Hits genius.com — not something CI should depend on. Skipped
+        // unless the caller opts in with RUN_LIVE_TESTS=1, so a Genius
+        // outage or a re-scored search result never reddens the build.
+        assumeTrue(
+            "Skip live network test; set RUN_LIVE_TESTS=1 to run it.",
+            System.getenv("RUN_LIVE_TESTS") == "1",
+        )
         println("--- TEST 1: Queen - Bohemian Rhapsody (Official Video) ---")
         val lyrics1 = Genius.lyrics("Bohemian Rhapsody (Official Video)", "Queen")
         assertNotNull(lyrics1)
