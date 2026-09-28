@@ -1198,4 +1198,15 @@
 
 
 
+    <string name="lyrics_share_pick_limit">Card is full</string>
+    <string name="lyrics_pick_count">%1$d lines · %2$d/%3$d</string>
+    <string name="lyrics_share_title">Share lyrics</string>
+    <string name="lyrics_share_description">The lines you picked, laid out on a card with the cover.</string>
+    <string name="share_your_lyrics">Share your lyrics</string>
+    <string name="your_lyrics_card">Your lyrics card</string>
+    <string name="saved_bang">Saved!</string>
+    <plurals name="lyrics_lines_picked">
+        <item quantity="one">%1$d line picked</item>
+        <item quantity="other">%1$d lines picked</item>
+    </plurals>
 </resources>
