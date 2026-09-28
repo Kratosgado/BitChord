@@ -18,6 +18,7 @@ import com.music.bitchord.ui.player.AudioOutputDevice
 import com.music.bitchord.ui.player.AudioOutputKind
 import com.music.bitchord.ui.player.CanvasVideoSpec
 import com.music.bitchord.ui.player.LyricsRomanizationResult
+import com.music.bitchord.ui.player.LyricsShareLinePayload
 import com.music.bitchord.ui.player.LyricsTranslationResult
 import com.music.bitchord.ui.player.MAX_LYRICS_OFFSET_MS
 import com.music.bitchord.ui.player.MIN_LYRICS_OFFSET_MS
@@ -151,6 +152,9 @@ internal object DesktopPlayerHost : PlayerHost {
     override fun showMessage(message: String) {
         messages.value = message
     }
+
+    // No lyrics-card renderer on the desktop yet; the pick UI simply closes.
+    override fun shareLyrics(song: Song, lines: List<LyricsShareLinePayload>) {}
 
     /** The desktop's signal-chain readout, supplied by the window that has the engine. */
     @Volatile

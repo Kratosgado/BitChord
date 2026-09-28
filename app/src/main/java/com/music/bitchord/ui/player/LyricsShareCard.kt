@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import com.music.bitchord.data.model.Song
 import com.music.bitchord.ui.replay.Fonts
 import com.music.bitchord.ui.replay.drawArtwork
 import com.music.bitchord.ui.replay.drawBackdrop
@@ -14,6 +15,57 @@ import com.music.bitchord.ui.replay.loadBitmap
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+
+/**
+ * One picked passage, as the string that goes on the card.
+ *
+ * Held as text rather than as [com.music.bitchord.data.lyrics.LyricLine] because
+ * the card has no idea what a line's timing is: it is handed what the reader was
+ * looking at, translation and all, and nothing else.
+ *
+ * @property subText The romanization or translation drawn small underneath, or
+ * null when the panel was showing the original alone.
+ * @property isGap A stand-in for the lines skipped between two picked ones,
+ * drawn as a centred ellipsis rather than as words.
+ */
+internal data class LyricsShareLine(
+    val text: String,
+    val subText: String?,
+    val isGap: Boolean = false,
+)
+
+/** Everything [renderLyricsShareCard] needs, gathered once by the player. */
+internal data class LyricsShareCard(
+    val song: Song,
+    /** Resolved sleeve — remote URL or local file, whatever the player found. */
+    val artworkUrl: String?,
+    val lines: List<LyricsShareLine>,
+)
+
+/**
+ * How much text one card is allowed to hold: the picked words, in characters.
+ *
+ * About five short lines — the point where the size ladder still lands near its
+ * top rung and the type stays big enough to read in a chat without pinching.
+ * Past it the only ways to keep going would be to shrink the type or to grow
+ * the card past the 9:16 it is meant to be, so the player stops the pick
+ * instead: the line is not added, and the bar says why. Nothing already picked
+ * is ever dropped.
+ */
+internal const val SHARE_CARD_CHAR_BUDGET = 250
+
+/**
+ * Whether a line of [text] can still join a card already holding [taken]
+ * characters — the whole of the rule the player enforces at the pick.
+ *
+ * Only the words are counted. The translation or romanization drawn under each
+ * line rides along and costs the card height, which the ladder pays for by
+ * taking a rung or two; counting it here instead would make the same five lines
+ * pickable or not depending on a toggle that has nothing to do with how long
+ * the verse is.
+ */
+internal fun fitsOnCard(taken: Int, text: String?): Boolean =
+    taken + (text?.length ?: 0) <= SHARE_CARD_CHAR_BUDGET
 
 /**
  * The picked lines as one picture, drawn to a bitmap you can send.
@@ -31,29 +83,26 @@ import kotlinx.coroutines.withContext
  *
  * ## Why it isn't Compose
  *
- * `Bitmap` + `android.graphics.Canvas`, exactly as
- * [com.music.bitchord.ui.replay.ReplayPoster] does it, and for the same
- * reasons written up there: Compose offscreen on minSdk 26 is a cascade of
- * hardware bitmaps and layers that fails differently per device, while a
- * software canvas draws identically from API 26 up. The backdrop, the logo, the
- * fonts and the sleeve are shared with the Replay by importing them rather than
- * by copying, so the two cards cannot drift apart.
+ * `Bitmap` + `android.graphics.Canvas`, exactly as [com.music.bitchord.ui.replay.ReplayPoster]
+ * does it, and for the same reasons written up there: Compose offscreen on
+ * minSdk 26 is a cascade of hardware bitmaps and layers that fails differently
+ * per device, while a software canvas draws identically from API 26 up. The
+ * backdrop, the logo, the fonts and the sleeve are shared with the Replay by
+ * importing them rather than by copying, so the two cards cannot drift apart.
  *
  * ## Fitting the type
  *
  * A passage can be one line or twenty, so both the size and the height are
  * chosen rather than fixed: the layout is retried down a fixed ladder of sizes
  * until the rows stop overflowing, and the card is then grown to exactly the
- * room those rows take. The bottom rung of that ladder is a floor rather than a
- * last resort — no card ever sets type smaller than it to squeeze a passage
+ * room those rows take. The bottom rung of that ladder is a floor rather than
+ * a last resort — no card ever sets type smaller than it to squeeze a passage
  * in, so a passage too long for the frame lengthens the card instead of being
  * cut, or made small enough to hold a phone at arm's length to read.
  */
 internal suspend fun renderLyricsShareCard(
     context: Context,
-    card: LyricsShareRequest,
-    /** Pad out to the full 1080×1920 frame, the passage centred in the room. */
-    story: Boolean = false,
+    card: LyricsShareCard,
 ): Bitmap = withContext(Dispatchers.Default) {
     val type = Fonts(context)
     val cover = card.artworkUrl?.let { loadBitmap(context, it) }
@@ -64,20 +113,16 @@ internal suspend fun renderLyricsShareCard(
     // barely taller than its own text instead of a 9:16 sheet with a paragraph
     // floating in the middle of it, and the size comes down only as far as the
     // ladder goes — past that the frame gives rather than the type does.
-    val headTop = HEADER_BOTTOM + GAP_ABOVE_BODY
-    val frameRoom = MAX_CARD_H - FOOTER_THUMB - FOOTER_PAD - GAP_BELOW_BODY - headTop
+    val bodyTop = HEADER_BOTTOM + GAP_ABOVE_BODY
+    val frameRoom = MAX_CARD_H - FOOTER_THUMB - FOOTER_PAD - GAP_BELOW_BODY - bodyTop
     val plan = fittestPlan(type, card.lines, frameRoom)
-    // A story is always the whole frame, so the spare room is split above and
-    // below the passage; otherwise the card is only as tall as its words.
-    val spare = if (story) (frameRoom - plan.content).coerceAtLeast(0f) else 0f
-    val bodyTop = headTop + spare / 2
     // The passage ends where its own rows end, and everything under it — the
     // gap, the sleeve credit, the foot — hangs off that. Because the card is
     // measured from the same sum the rows are drawn from, no line can ever
     // land past the bottom by a rounding error and be replaced by a mark
     // saying something was left out.
     val bodyBottom = bodyTop + plan.content
-    val cardH = bodyBottom + spare / 2 + GAP_BELOW_BODY + FOOTER_THUMB + FOOTER_PAD
+    val cardH = bodyBottom + GAP_BELOW_BODY + FOOTER_THUMB + FOOTER_PAD
 
     val bitmap = Bitmap.createBitmap(CARD_W, cardH.roundToInt(), Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
@@ -125,7 +170,7 @@ internal suspend fun renderLyricsShareCard(
     bitmap
 }
 
-// ── Fitting ────────────────────────────────────────────────────────────────
+// ── Fitting ──────────────────────────────────────────────────────────────────
 
 private class Row(
     val text: String,
@@ -215,7 +260,7 @@ private fun planAt(type: Fonts, lines: List<LyricsShareLine>, size: Float): Plan
     return Plan(rows, -primary.ascent())
 }
 
-// ── Text ───────────────────────────────────────────────────────────────────
+// ── Text ─────────────────────────────────────────────────────────────────────
 
 /**
  * Greedy wrap at [width], breaking wherever the line has to.
@@ -253,7 +298,7 @@ private fun wrap(text: String, paint: Paint, width: Float): List<String> {
     return out.filter { it.isNotEmpty() }.ifEmpty { listOf("") }
 }
 
-// ── Card geometry ──────────────────────────────────────────────────────────
+// ── Card geometry ────────────────────────────────────────────────────────────
 
 private const val CARD_W = 1080
 
@@ -299,7 +344,7 @@ private const val GAP_MARKER_OFFSET = 0.18f
  */
 private val FIT_LADDER = floatArrayOf(96f, 88f, 80f, 72f, 64f, 56f, 50f, 44f, 38f, 32f)
 
-// ── The panel's type, as ratios ────────────────────────────────────────────
+// ── The panel's type, as ratios ──────────────────────────────────────────────
 // Every number here is one the lyrics panel uses, divided by the size it uses
 // it at so it holds at whatever size the ladder lands on.
 

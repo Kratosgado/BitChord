@@ -297,6 +297,9 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.layout.onSizeChanged
 import com.music.bitchord.ui.player.LocalPlayerDock
 import com.music.bitchord.ui.player.PlayerDock
+import com.music.bitchord.ui.player.AndroidPlayerHost
+import com.music.bitchord.ui.player.LyricsShareSheet
+import com.music.bitchord.ui.player.PlayerPlatform
 import com.music.bitchord.ui.screens.DetailScreen
 import com.music.bitchord.ui.screens.sortedForDetail
 import com.music.bitchord.ui.screens.ExploreScreen
@@ -2513,6 +2516,18 @@ private fun BitChordApp(
                 }
             },
         )
+
+        val playerHost = PlayerPlatform.host as? AndroidPlayerHost
+        if (playerHost != null) {
+            val lyricsShare by playerHost.lyricsShareRequest.collectAsStateWithLifecycle()
+            lyricsShare?.let { request ->
+                LyricsShareSheet(
+                    hazeState = hazeState,
+                    request = request,
+                    onDismiss = { playerHost.dismissLyricsShare() },
+                )
+            }
+        }
     }
 
     Box(
