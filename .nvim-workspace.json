@@ -1,0 +1,26 @@
+{
+  "folders": ["/home/esslifie/projects/apps/BitChord"],
+  "name": "BitChord",
+  "tasks": [
+    {
+      "name": "emulator",
+      "folder": "BitChord",
+      "cmd": "emulator -avd Pixel_3"
+    },
+    {
+      "name": "install",
+      "folder": "BitChord",
+      "cmd": "./gradlew installProdDebug && adb logcat -c && adb shell am start -n com.music.bitchord/com.music.bitchord.MainActivity && adb logcat --pid=$(adb shell pidof com.music.bitchord)"
+    },
+    {
+      "name": "build",
+      "folder": "BitChord",
+      "cmd": "./gradlew assembleProdDebug"
+    },
+    {
+      "name": "desktop",
+      "folder": "BitChord",
+      "cmd": "./gradlew :desktopApp:run"
+    }
+  ]
+}
