@@ -235,6 +235,9 @@ import com.music.bitchord.ui.icons.BitChordIcons
 import androidx.media3.common.Player
 import com.music.bitchord.data.YtMusicRepository
 import com.music.bitchord.ui.player.NowPlayingScreen
+import com.music.bitchord.ui.player.AndroidPlayerHost
+import com.music.bitchord.ui.player.LyricsShareSheet
+import com.music.bitchord.ui.player.PlayerPlatform
 import com.music.bitchord.ui.screens.DetailScreen
 import com.music.bitchord.ui.screens.ExploreScreen
 import com.music.bitchord.ui.screens.LocalMusicScreen
@@ -2214,6 +2217,18 @@ private fun BitChordApp(
                 }
             },
         )
+
+        val playerHost = PlayerPlatform.host as? AndroidPlayerHost
+        if (playerHost != null) {
+            val lyricsShare by playerHost.lyricsShareRequest.collectAsStateWithLifecycle()
+            lyricsShare?.let { request ->
+                LyricsShareSheet(
+                    hazeState = hazeState,
+                    request = request,
+                    onDismiss = { playerHost.dismissLyricsShare() },
+                )
+            }
+        }
     }
 
     Box(

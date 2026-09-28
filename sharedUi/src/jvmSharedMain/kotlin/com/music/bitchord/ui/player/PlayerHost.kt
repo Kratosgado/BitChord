@@ -83,6 +83,9 @@ interface PlayerHost {
     /** A short, non-blocking notice — a Toast on the phone. */
     fun showMessage(message: String)
 
+    /** Show the lyrics-share sheet for [song] with the reader's picked [lines]. Android renders a card; other platforms may no-op. */
+    fun shareLyrics(song: Song, lines: List<LyricsShareLinePayload>)
+
     /** The full signal-chain readout, opened from the output drawer. */
     @Composable
     fun AudioPipelineDialog(hazeState: HazeState, isPlaying: Boolean, onDismiss: () -> Unit)
@@ -180,6 +183,15 @@ data class PartyUi(
     val you: PartyMember? = null,
     val code: String? = null,
 )
+
+/**
+ * A platform-neutral picked lyric line handed across the [PlayerHost] seam.
+ *
+ * The shared player has no idea how a card is drawn: it hands the reader's
+ * picked text over the seam and Android turns it into a picture. [isGap] stands
+ * in for the lines skipped between two picked ones, drawn as an ellipsis.
+ */
+data class LyricsShareLinePayload(val text: String, val subText: String?, val isGap: Boolean = false)
 
 sealed interface LyricsTranslationResult {
     data class Translated(val lines: List<LyricLine>) : LyricsTranslationResult

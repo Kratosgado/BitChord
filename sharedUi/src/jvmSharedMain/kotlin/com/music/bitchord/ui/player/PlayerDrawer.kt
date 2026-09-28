@@ -94,7 +94,10 @@ private const val DISMISS_DRAG_FRACTION = 0.25f
  */
 @OptIn(ExperimentalHazeMaterialsApi::class)
 @Composable
-internal fun PlayerDrawer(
+// Public rather than internal: the phone's Android-only share sheets
+// (e.g. LyricsShareSheet) live in the app module and reuse this drawer chrome,
+// so the player's own drawers and those stay visually one and the same.
+fun PlayerDrawer(
     hazeState: HazeState,
     title: String,
     onDismiss: () -> Unit,

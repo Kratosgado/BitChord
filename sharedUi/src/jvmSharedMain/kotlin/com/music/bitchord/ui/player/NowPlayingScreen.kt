@@ -37,6 +37,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.ui.draw.alpha
@@ -62,7 +63,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Undo
 import androidx.compose.material.icons.rounded.FastForward
 import androidx.compose.material.icons.rounded.FastRewind
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.IosShare
 import androidx.compose.material.icons.rounded.MoreHoriz
+import androidx.compose.material3.Button
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -801,6 +806,81 @@ fun NowPlayingScreen(
         loadingText = lyricsLoadingText,
         haptics = haptics,
     )
+    // Everything the pick bar does, kept together so neither lyrics layout has
+    // to know how a pick becomes a card. The picks are indices into the
+    // original [lyrics]; the panel always draws those, translation and all
+    // riding along as sub-lines.
+    var lyricPicking by remember(song.videoId) { mutableStateOf(false) }
+    var lyricPicks by remember(song.videoId) { mutableStateOf<Set<Int>>(emptySet()) }
+    var lyricPickOverBudget by remember(song.videoId) { mutableStateOf(false) }
+    // Adding is subject to [SHARE_CARD_CHAR_BUDGET], counted across everything
+    // already chosen: the card draws every line it is handed, so the pick is
+    // the only place a limit can sit without dropping words afterwards.
+    val lyricPickedChars: () -> Int = {
+        lyricPicks.sumOf { index -> lyrics.orEmpty().getOrNull(index)?.text?.length ?: 0 }
+    }
+    val toggleLyricPick: (Int) -> Unit = { index ->
+        val text = lyrics.orEmpty().getOrNull(index)?.text
+        when {
+            index in lyricPicks -> {
+                lyricPicks = lyricPicks - index
+                lyricPickOverBudget = false
+            }
+
+            fitsOnShareCard(lyricPickedChars(), text) -> {
+                lyricPicks = lyricPicks + index
+                lyricPickOverBudget = false
+            }
+
+            else -> lyricPickOverBudget = true
+        }
+    }
+    val cancelLyricPick: () -> Unit = {
+        lyricPicking = false
+        lyricPicks = emptySet()
+        lyricPickOverBudget = false
+    }
+    // Long-press is the way in, so it has to open the mode *and* — once the mode
+    // is open — behave exactly as a tap does.
+    val pickLyricLine: (Int) -> Unit = { index ->
+        if (lyricPicking) {
+            toggleLyricPick(index)
+        } else {
+            lyricPicking = true
+            lyricPicks = emptySet()
+            lyricPickOverBudget = false
+            // The first line goes through the same budget as the rest.
+            toggleLyricPick(index)
+        }
+    }
+    val shareLyricPick: () -> Unit = {
+        val source = lyrics.orEmpty()
+        val subs = lyricsTranslation.subLines
+        val chosen = lyricPicks.sorted()
+        val payloads = buildList {
+            chosen.forEachIndexed { position, index ->
+                // A jump over unchosen lines is marked on the card, so the
+                // picture says the verse was cut here rather than letting two
+                // distant halves read as if they ran on from each other.
+                if (position > 0 && index > chosen[position - 1] + 1) {
+                    add(LyricsShareLinePayload(text = "", subText = null, isGap = true))
+                }
+                val line = source.getOrNull(index) ?: return@forEachIndexed
+                val sub = subs?.getOrNull(index)?.text
+                add(
+                    LyricsShareLinePayload(
+                        text = line.text,
+                        subText = sub?.takeIf { it.isNotBlank() && it != line.text },
+                    ),
+                )
+            }
+        }.filter { it.isGap || it.text.isNotBlank() }
+        // An empty pick draws nothing worth sending, so it is simply left alone.
+        if (payloads.isNotEmpty()) {
+            PlayerPlatform.host.shareLyrics(song, payloads)
+        }
+        cancelLyricPick()
+    }
     // Nothing here resets [lyricsOpen] on a track change, deliberately. The
     // panel is a place, not a property of the track: someone reading along who
     // skips — or who simply lets the queue run on — means to carry on reading,
@@ -1559,20 +1639,24 @@ fun NowPlayingScreen(
                         status = lyricsTranslation.status,
                         onChangeProvider = { showLyricsProviders = true },
                         romanizationToggle = {
-                            RomanizationToggleButton(
-                                state = lyricsTranslation.romanizationState,
-                                showingRomanization = lyricsTranslation.showingRomanization,
-                                enabled = !lyrics.isNullOrEmpty(),
-                                onClick = lyricsTranslation.toggleRomanization,
-                            )
+                            if (!lyricPicking) {
+                                RomanizationToggleButton(
+                                    state = lyricsTranslation.romanizationState,
+                                    showingRomanization = lyricsTranslation.showingRomanization,
+                                    enabled = !lyrics.isNullOrEmpty(),
+                                    onClick = lyricsTranslation.toggleRomanization,
+                                )
+                            }
                         },
                         translationToggle = {
-                            TranslationToggleButton(
-                                state = lyricsTranslation.translationState,
-                                showingTranslation = lyricsTranslation.showingTranslation,
-                                enabled = !lyrics.isNullOrEmpty(),
-                                onClick = lyricsTranslation.toggleTranslation,
-                            )
+                            if (!lyricPicking) {
+                                TranslationToggleButton(
+                                    state = lyricsTranslation.translationState,
+                                    showingTranslation = lyricsTranslation.showingTranslation,
+                                    enabled = !lyrics.isNullOrEmpty(),
+                                    onClick = lyricsTranslation.toggleTranslation,
+                                )
+                            }
                         },
                     ) { panelModifier ->
                         LyricsTranslationMotion(
@@ -1587,20 +1671,35 @@ fun NowPlayingScreen(
                             // a tap to reveal, and leaving the reveal gesture
                             // armed would only eat taps meant for the lines.
                             PlaybackPositionScope(lyricsPosition) { lyricsPositionMs ->
-                                LyricsPanel(
-                                    lines = lyrics.orEmpty(),
-                                    subLines = lyricsTranslation.subLines,
-                                    trackKey = song.videoId,
-                                    positionMs = lyricsPositionMs,
-                                    looking = !lyricsUnavailable,
-                                    isPlaying = isPlaying,
-                                    onSeekToLine = seekToLyric,
-                                    controlsOpen = true,
-                                    onRevealControls = {},
-                                    onHideControls = {},
-                                    translationProgress = particleProgress,
-                                    modifier = Modifier.fillMaxSize(),
-                                )
+                                Box(Modifier.fillMaxSize()) {
+                                    LyricsPanel(
+                                        lines = lyrics.orEmpty(),
+                                        subLines = lyricsTranslation.subLines,
+                                        trackKey = song.videoId,
+                                        positionMs = lyricsPositionMs,
+                                        looking = !lyricsUnavailable,
+                                        isPlaying = isPlaying,
+                                        onSeekToLine = seekToLyric,
+                                        controlsOpen = true,
+                                        onRevealControls = {},
+                                        onHideControls = {},
+                                        translationProgress = particleProgress,
+                                        picking = lyricPicking,
+                                        picked = lyricPicks,
+                                        onPickLine = pickLyricLine,
+                                        onToggleLine = toggleLyricPick,
+                                        modifier = Modifier.fillMaxSize(),
+                                    )
+                                    if (lyricPicking) {
+                                        LyricsPickBar(
+                                            count = lyricPicks.size,
+                                            overBudget = lyricPickOverBudget,
+                                            onCancel = cancelLyricPick,
+                                            onShare = shareLyricPick,
+                                            modifier = Modifier.align(Alignment.BottomCenter),
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
@@ -2683,22 +2782,37 @@ fun NowPlayingScreen(
                                 .graphicsLayer { alpha = if (lyricsPanelVisible) panelFade else 0f },
                         ) { particleProgress ->
                             PlaybackPositionScope(lyricsPosition) { lyricsPositionMs ->
-                                LyricsPanel(
-                                    lines = lyrics.orEmpty(),
-                                    subLines = lyricsTranslation.subLines,
-                                    trackKey = song.videoId,
-                                    positionMs = lyricsPositionMs,
-                                    looking = !lyricsUnavailable,
-                                    isPlaying = isPlaying,
-                                    active = lyricsPanelVisible,
-                                    onSeekToLine = seekToLyric,
-                                    controlsOpen = lyricsControlsOpen,
-                                    onRevealControls = { lyricsControlsOpen = true },
-                                    onHideControls = { lyricsControlsOpen = false },
-                                    translationProgress = particleProgress,
-                                    onScrollingChange = { lyricsScrolling = it },
-                                    modifier = Modifier.fillMaxSize(),
-                                )
+                                Box(Modifier.fillMaxSize()) {
+                                    LyricsPanel(
+                                        lines = lyrics.orEmpty(),
+                                        subLines = lyricsTranslation.subLines,
+                                        trackKey = song.videoId,
+                                        positionMs = lyricsPositionMs,
+                                        looking = !lyricsUnavailable,
+                                        isPlaying = isPlaying,
+                                        active = lyricsPanelVisible,
+                                        onSeekToLine = seekToLyric,
+                                        controlsOpen = lyricsControlsOpen,
+                                        onRevealControls = { lyricsControlsOpen = true },
+                                        onHideControls = { lyricsControlsOpen = false },
+                                        translationProgress = particleProgress,
+                                        onScrollingChange = { lyricsScrolling = it },
+                                        picking = lyricPicking,
+                                        picked = lyricPicks,
+                                        onPickLine = pickLyricLine,
+                                        onToggleLine = toggleLyricPick,
+                                        modifier = Modifier.fillMaxSize(),
+                                    )
+                                    if (lyricPicking) {
+                                        LyricsPickBar(
+                                            count = lyricPicks.size,
+                                            overBudget = lyricPickOverBudget,
+                                            onCancel = cancelLyricPick,
+                                            onShare = shareLyricPick,
+                                            modifier = Modifier.align(Alignment.BottomCenter),
+                                        )
+                                    }
+                                }
                             }
                         }
 
@@ -2714,7 +2828,7 @@ fun NowPlayingScreen(
                     // for reading, and a control parked over the words when
                     // nobody asked for the controls is one more thing between
                     // the reader and them.
-                    val translateShown = lyricsPanelVisible && lyricsControlsOpen
+                    val translateShown = lyricsPanelVisible && lyricsControlsOpen && !lyricPicking
                     val translateFade by animateFloatAsState(
                         targetValue = if (translateShown) 1f else 0f,
                         animationSpec = tween(if (translateShown) 220 else 160),
@@ -3021,4 +3135,80 @@ private suspend fun AwaitPointerEventScope.dragQueueIn(
     }
     onHold(false)
     onSettle(open)
+}
+
+/**
+ * How much text one share card is allowed to hold, in characters — the picked
+ * words only. Kept in step with the app module's SHARE_CARD_CHAR_BUDGET, which
+ * is where the card is actually drawn: the pick is enforced here, in shared
+ * code, so the value has to live on both sides of the seam.
+ */
+private const val SHARE_CARD_CHAR_BUDGET = 250
+
+/** Whether a line of [text] still fits a card already holding [taken] characters. */
+private fun fitsOnShareCard(taken: Int, text: String?): Boolean =
+    taken + (text?.length ?: 0) <= SHARE_CARD_CHAR_BUDGET
+
+/**
+ * The floating bar while lines are being picked: Cancel at the left edge and
+ * Share at the right, each with a clear half of the pill.
+ *
+ * A pill over the words rather than a row in the controls: the controls fade
+ * away on their own, and a mode that can vanish while it is still on reads as
+ * the panel having started ignoring taps. It sits centred, which is why the
+ * translate and romanize toggles stand down for as long as it is up.
+ *
+ * Built from plain Material 3 buttons rather than the Android share sheet's
+ * ShareAction — that lives in the app module and draws the card; this is
+ * platform-neutral shared UI and only reports the two choices back out.
+ */
+@Composable
+private fun LyricsPickBar(
+    count: Int,
+    overBudget: Boolean,
+    onCancel: () -> Unit,
+    onShare: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val haptics = rememberHaptics()
+    val somethingPicked = count > 0
+    Row(
+        modifier = modifier
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+            .fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        FilledTonalButton(
+            onClick = {
+                haptics.play(Haptic.Tap)
+                onCancel()
+            },
+            modifier = Modifier.weight(1f),
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Close,
+                contentDescription = null,
+                modifier = Modifier.size(19.dp),
+            )
+            Spacer(Modifier.width(10.dp))
+            Text(text = stringResource(Res.string.cancel))
+        }
+        Button(
+            onClick = {
+                haptics.play(Haptic.Select)
+                onShare()
+            },
+            enabled = somethingPicked && !overBudget,
+            modifier = Modifier.weight(1f),
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.IosShare,
+                contentDescription = null,
+                modifier = Modifier.size(19.dp),
+            )
+            Spacer(Modifier.width(10.dp))
+            Text(text = stringResource(Res.string.share))
+        }
+    }
 }

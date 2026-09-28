@@ -414,6 +414,16 @@
     <string name="first_button">First button</string>
     <string name="got_it">Got it</string>
     <string name="pause">Pause</string>
+    <string name="lyrics_share_pick_limit">Card is full</string>
+    <string name="lyrics_pick_count">%1$d lines · %2$d/%3$d</string>
+    <string name="lyrics_share_title">Share lyrics</string>
+    <string name="lyrics_share_description">The lines you picked, laid out on a card with the cover.</string>
+    <string name="share_your_lyrics">Share your lyrics</string>
+    <string name="your_lyrics_card">Your lyrics card</string>
+    <plurals name="lyrics_lines_picked">
+        <item quantity="one">%1$d line picked</item>
+        <item quantity="other">%1$d lines picked</item>
+    </plurals>
     <string name="shuffle_on">Shuffle on</string>
     <string name="shuffle_off">Shuffle off</string>
     <string name="audio_pipeline">Audio Pipeline</string>
@@ -683,6 +693,7 @@
     <string name="replay_songs_start">In total, </string>
     <string name="replay_summary_start">Your listening had a </string>
     <string name="saved">Saved</string>
+    <string name="saved_bang">Saved!</string>
     <string name="share_my_replay">Share my Replay</string>
     <string name="share_your_replay">Share your Replay</string>
     <string name="tap_share_for_picture">Tap Share to create a picture</string>
