@@ -778,6 +778,58 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val _playlistsLoading = MutableStateFlow(false)
     val playlistsLoading: StateFlow<Boolean> = _playlistsLoading.asStateFlow()
 
+    /**
+     * Which of the account's playlists hold which tracks — keyed by playlist
+     * id, valued by the set of videoIds on it. Populated lazily by
+     * [preloadPlaylistMembership] the first time the picker opens against a
+     * playlist, and mutated in place by [addSongsToPlaylist] on success so a
+     * just-added row's check appears without a re-fetch. Not persisted: a new
+     * session pays the round trip again, and neither does it need to.
+     */
+    private val _playlistSongs = MutableStateFlow<Map<String, Set<String>>>(emptyMap())
+    val playlistSongs: StateFlow<Map<String, Set<String>>> = _playlistSongs.asStateFlow()
+
+    /**
+     * Fetches every playlist's track list once, so the picker can mark the
+     * rows the current target already sits on. Cheap for playlists whose page
+     * is already open ([_detailStack] seeds them without a request), a
+     * capped fan-out otherwise so a shelf of dozens can't fire dozens of
+     * requests at once.
+     */
+    fun preloadPlaylistMembership(playlists: List<UserPlaylist>) {
+        if (!_signedIn.value) return
+        val cache = _playlistSongs.value
+        val missing = playlists.filter { it.playlistId !in cache && it.browseId != null }
+        if (missing.isEmpty()) return
+        // Seed from any playlist page already loaded, so the picker doesn't
+        // ask for what the app already has.
+        val seeded = _playlistSongs.value.toMutableMap()
+        for (playlist in missing) {
+            val id = playlist.browseId ?: continue
+            val open = (_detailStack.value.firstOrNull { it.browseId == id }?.songs as? UiState.Success)?.data
+            if (open != null) seeded[playlist.playlistId] = open.mapTo(HashSet()) { it.videoId }
+        }
+        _playlistSongs.value = seeded
+        val toFetch = missing.filter { it.playlistId !in seeded }
+        if (toFetch.isEmpty()) return
+        viewModelScope.launch {
+            val limiter = Semaphore(3)
+            coroutineScope {
+                toFetch.forEach { playlist ->
+                    val browseId = playlist.browseId ?: return@forEach
+                    launch {
+                        val songs = limiter.withPermit {
+                            YtMusicRepository.allSongs(browseId).getOrNull()
+                        } ?: return@launch
+                        _playlistSongs.value = _playlistSongs.value.toMutableMap().apply {
+                            put(playlist.playlistId, songs.mapTo(HashSet()) { it.videoId })
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     /** Re-fetched rather than cached for the session: playlists are edited here. */
     fun loadPlaylists() {
         if (!_signedIn.value || _playlistsLoading.value) return
@@ -848,43 +900,80 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     /**
      * Adds [song] to a playlist, from the picker.
      *
-     * Not optimistic, unlike a rating: the picker closes on the tap and there is
-     * nothing left of it to update, and a playlist that shows a track it turned
-     * out not to have taken is worse than one that shows it a moment late.
-     *
-     * The playlist's own page is the exception, because it can be the thing
-     * behind the picker — a row's menu on a playlist offers "Add to playlist" —
-     * and a page that doesn't show what was just added to it is the bug this is
-     * part of fixing. Still after the answer, not ahead of it.
-     *
-     * [onResult] tells the caller whether the track was already in the
-     * playlist, so it can show the same kind of notice "Add to queue" and
-     * "Play next" do — see [MainActivity]'s `showQueueNotice`. YouTube itself
-     * has no objection to a duplicate row, so that check is made here, against
-     * the playlist's own page if it is open, or a fresh fetch of it otherwise —
-     * and a real duplicate is never sent, rather than added and only reported.
+     * Thin wrapper over [addSongsToPlaylist] with the single-track notice
+     * translated back into "yes/no already in playlist" the picker's toast
+     * still speaks. The picker no longer closes on the tap, so the row can
+     * update to its "already in playlist" state before the next add.
      */
     fun addToPlaylist(playlist: UserPlaylist, song: Song, onResult: (alreadyInPlaylist: Boolean) -> Unit = {}) {
+        addSongsToPlaylist(playlist, listOf(song)) { _, duplicates -> onResult(duplicates > 0) }
+    }
+
+    /**
+     * Adds one or many tracks to a playlist. The single-track path from the
+     * picker and the whole-album path from the release sheet are the same
+     * request underneath — [YtMusicRepository.addToPlaylist] already accepts
+     * a list — so there is one place membership is consulted, one place the
+     * cache and the open playlist page are updated, and one place a duplicate
+     * is quietly dropped rather than added and only reported.
+     *
+     * [onResult] is (accepted, duplicates): tracks the account said yes to,
+     * and tracks the picker skipped because the cache already had them.
+     * Callers show the counts as a notice; the picker's own toast is the
+     * yes/no version of it.
+     */
+    fun addSongsToPlaylist(
+        playlist: UserPlaylist,
+        songs: List<Song>,
+        onResult: (added: Int, duplicates: Int) -> Unit = { _, _ -> },
+    ) {
         if (!requireSignIn()) return
+        if (songs.isEmpty()) {
+            onResult(0, 0)
+            return
+        }
         viewModelScope.launch {
-            val openSongs = (_detailStack.value.firstOrNull { it.browseId == playlist.browseId }
-                ?.songs as? UiState.Success)?.data
-            val known = openSongs
-                ?: YtMusicRepository.allSongs(playlist.browseId).getOrNull()
-            if (known?.any { it.videoId == song.videoId } == true) {
-                onResult(true)
+            val cached = _playlistSongs.value[playlist.playlistId]
+                ?: run {
+                    // Cache miss for a playlist the picker has never asked
+                    // about: check its page if it happens to be open, else
+                    // pay the round trip once and remember the answer.
+                    val open = (_detailStack.value.firstOrNull { it.browseId == playlist.browseId }
+                        ?.songs as? UiState.Success)?.data
+                    val fetched = open
+                        ?: playlist.browseId?.let { YtMusicRepository.allSongs(it).getOrNull() }
+                        ?: emptyList()
+                    val set = fetched.mapTo(HashSet()) { it.videoId }
+                    _playlistSongs.value = _playlistSongs.value.toMutableMap().apply {
+                        put(playlist.playlistId, set)
+                    }
+                    set
+                }
+            val toAdd = songs.filter { it.videoId !in cached }
+            val duplicates = songs.size - toAdd.size
+            if (toAdd.isEmpty()) {
+                onResult(0, duplicates)
                 return@launch
             }
-            YtMusicRepository.addToPlaylist(playlist.playlistId, listOf(song.videoId)).fold(
-                onSuccess = { added ->
+            YtMusicRepository.addToPlaylist(playlist.playlistId, toAdd.map { it.videoId }).fold(
+                onSuccess = { addedIds ->
                     libraryStale = true
-                    // The playlist's page may be open behind the picker — it is
-                    // reachable from a row's own menu on it — so the track goes
-                    // into it for the same reason [addSuggestedSong] does.
-                    appendToOpenPlaylist(playlist.browseId, song, added[song.videoId])
-                    onResult(false)
+                    // Roll the accepted ids into the membership cache so the
+                    // picker's check icon appears immediately on the next
+                    // read — no re-fetch needed.
+                    _playlistSongs.value = _playlistSongs.value.toMutableMap().apply {
+                        put(playlist.playlistId, (cached + addedIds.keys))
+                    }
+                    // The playlist's page may be open behind the picker — it
+                    // is reachable from a row's own menu on it — so each
+                    // track goes into it for the same reason
+                    // [addSuggestedSong] does.
+                    for (song in toAdd) {
+                        appendToOpenPlaylist(playlist.browseId, song, addedIds[song.videoId])
+                    }
+                    onResult(toAdd.size, duplicates)
                 },
-                onFailure = {},
+                onFailure = { onResult(0, duplicates) },
             )
         }
     }
