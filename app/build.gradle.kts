@@ -56,6 +56,11 @@ val listenTogetherServer: String = (
 // See the root build.gradle.kts: one version for the phone and its watch app.
 val betaSuffix = rootProject.extra["bitchordBetaSuffix"] as String
 
+val appVersion: String = providers.gradleProperty("bitchord.version").orNull
+    ?.removePrefix("v")
+    ?.takeIf { it.isNotBlank() }
+    ?: "1.8.3"
+
 android {
     namespace = "com.music.bitchord"
     // InnerTubeX's AAR requires compiling against 37; targetSdk (runtime behaviour) stays 36.
