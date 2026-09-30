@@ -69,6 +69,11 @@ val listenTogetherServer: String = (
  */
 val betaSuffix = ""
 
+val appVersion: String = providers.gradleProperty("bitchord.version").orNull
+    ?.removePrefix("v")
+    ?.takeIf { it.isNotBlank() }
+    ?: "1.8.3"
+
 android {
     namespace = "com.music.bitchord"
     // InnerTubeX's AAR requires compiling against 37; targetSdk (runtime behaviour) stays 36.
@@ -80,8 +85,8 @@ android {
         // Haze falls back to a translucent scrim below that.
         minSdk = 26
         targetSdk = 36
-        versionCode = 23
-        versionName = "1.7.1"
+        versionCode = 24
+        versionName = appVersion
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
