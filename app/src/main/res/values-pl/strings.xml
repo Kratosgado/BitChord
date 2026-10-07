@@ -511,9 +511,7 @@
     <string name="replay_songs_start">W sumie, </string>
     <string name="replay_summary_start">Twój styl słuchania miał </string>
     <string name="saved">Zapisano</string>
-    <string name="saved_bang">Zapisano!</string>
     <string name="share_my_replay">Udostępnij mój Replay</string>
-    <string name="share_your_lyrics">Wyślij kartę tekstu</string>
     <string name="share_your_replay">Udostępnij swój Replay</string>
     <string name="tap_share_for_picture">Stuknij Udostępnij, aby utworzyć obrazek</string>
     <string name="top_album">Najlepszy album</string>
@@ -523,7 +521,6 @@
     <string name="when_you_listen_the_most">Kiedy słuchasz najwięcej</string>
     <string name="your_biggest_day">Twój najlepszy dzień: %1$s</string>
     <string name="your_listening_experience">Twoje doświadczenie ze słuchaniem</string>
-    <string name="your_lyrics_card">Twoja karta tekstu</string>
     <string name="your_replay">Twój Replay</string>
     <string name="all_audio_folders">Wszystkie foldery z dźwiękami</string>
     <string name="local_music_folder">Folder z lokalną muzyką</string>

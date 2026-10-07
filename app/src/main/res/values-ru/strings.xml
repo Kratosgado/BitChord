@@ -570,9 +570,7 @@
     <string name="replay_songs_start">Всего </string>
     <string name="replay_summary_start">В центре вашего прослушивания был </string>
     <string name="saved">Сохранено</string>
-    <string name="saved_bang">Сохранено!</string>
     <string name="share_my_replay">Поделиться моим Replay</string>
-    <string name="share_your_lyrics">Отправить карточку с текстом</string>
     <string name="share_your_replay">Поделиться своим Replay</string>
     <string name="tap_share_for_picture">Нажмите «Поделиться», чтобы создать изображение</string>
     <string name="top_album">Топ-альбом</string>
@@ -582,7 +580,6 @@
     <string name="when_you_listen_the_most">Когда вы слушаете больше всего</string>
     <string name="your_biggest_day">Ваш самый насыщенный день: %1$s</string>
     <string name="your_listening_experience">Ваш опыт прослушивания</string>
-    <string name="your_lyrics_card">Ваша карточка с текстом</string>
     <string name="your_replay">Ваш Replay</string>
     <plurals name="replay_artist_count">
         <item quantity="one">%1$s исполнитель</item>

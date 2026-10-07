@@ -532,9 +532,7 @@
     <string name="replay_songs_start">总共，</string>
     <string name="replay_summary_start">你的收听呈现出 </string>
     <string name="saved">已保存</string>
-    <string name="saved_bang">已保存！</string>
     <string name="share_my_replay">分享我的 Replay</string>
-    <string name="share_your_lyrics">发送歌词卡片</string>
     <string name="share_your_replay">分享你的 Replay</string>
     <string name="tap_share_for_picture">点按分享以生成图片</string>
     <string name="top_album">热门专辑</string>
@@ -544,7 +542,6 @@
     <string name="when_you_listen_the_most">你最常收听的时段</string>
     <string name="your_biggest_day">你收听最多的一天：%1$s</string>
     <string name="your_listening_experience">你的收听体验</string>
-    <string name="your_lyrics_card">你的歌词卡片</string>
     <string name="your_replay">你的 Replay</string>
     <plurals name="replay_artist_count">
         <item quantity="other">%1$s 位艺人</item>

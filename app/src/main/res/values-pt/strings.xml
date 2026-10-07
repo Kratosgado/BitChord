@@ -513,9 +513,7 @@
     <string name="replay_songs_start">No total, </string>
     <string name="replay_summary_start">Seu estilo de ouvir teve um clima </string>
     <string name="saved">Salvo</string>
-    <string name="saved_bang">Guardado!</string>
     <string name="share_my_replay">Compartilhar meu Replay</string>
-    <string name="share_your_lyrics">Enviar o teu cartão de letra</string>
     <string name="share_your_replay">Compartilhe seu Replay</string>
     <string name="tap_share_for_picture">Toque em Compartilhar para criar uma imagem</string>
     <string name="top_album">Principal álbum</string>
@@ -525,7 +523,6 @@
     <string name="when_you_listen_the_most">Quando você mais ouve</string>
     <string name="your_biggest_day">Seu maior dia: %1$s</string>
     <string name="your_listening_experience">Sua experiência de escuta</string>
-    <string name="your_lyrics_card">O teu cartão de letra</string>
     <string name="your_replay">Seu Replay</string>
     <string name="all_audio_folders">Todas as pastas de áudio</string>
     <string name="local_music_folder">Pasta de música local</string>

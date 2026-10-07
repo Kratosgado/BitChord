@@ -548,9 +548,7 @@
     <string name="replay_songs_start">Insgesamt füllten </string>
     <string name="replay_summary_start">Dein Hörverhalten hatte </string>
     <string name="saved">Gespeichert</string>
-    <string name="saved_bang">Gespeichert!</string>
     <string name="share_my_replay">Mein Replay teilen</string>
-    <string name="share_your_lyrics">Textkarte senden</string>
     <string name="share_your_replay">Dein Replay teilen</string>
     <string name="tap_share_for_picture">Tippe auf Teilen, um ein Bild zu erstellen</string>
     <string name="top_album">Top-Album</string>
@@ -560,7 +558,6 @@
     <string name="when_you_listen_the_most">Wann du am meisten hörst</string>
     <string name="your_biggest_day">Dein größter Tag: %1$s</string>
     <string name="your_listening_experience">Dein Hörerlebnis</string>
-    <string name="your_lyrics_card">Deine Textkarte</string>
     <string name="your_replay">Dein Replay</string>
     <plurals name="replay_artist_count">
         <item quantity="one">%1$s Künstler</item>

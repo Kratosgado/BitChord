@@ -569,9 +569,7 @@
     <string name="replay_songs_start">Tổng cộng, </string>
     <string name="replay_summary_start">Gu âm nhạc của bạn mang phong cách </string>
     <string name="saved">Đã lưu</string>
-    <string name="saved_bang">Đã lưu!</string>
     <string name="share_my_replay">Chia sẻ Replay của tôi</string>
-    <string name="share_your_lyrics">Gửi thẻ lời bài hát</string>
     <string name="share_your_replay">Chia sẻ Replay của bạn</string>
     <string name="tap_share_for_picture">Nhấn Chia sẻ để tạo hình ảnh</string>
     <string name="top_album">Album hàng đầu</string>
@@ -581,7 +579,6 @@
     <string name="when_you_listen_the_most">Thời điểm bạn nghe nhiều nhất</string>
     <string name="your_biggest_day">Ngày nghe nhiều nhất: %1$s</string>
     <string name="your_listening_experience">Trải nghiệm nghe nhạc của bạn</string>
-    <string name="your_lyrics_card">Thẻ lời bài hát của bạn</string>
     <string name="your_replay">BitChord Replay của bạn</string>
     <plurals name="replay_artist_count">
         <item quantity="other">%1$s nghệ sĩ</item>
@@ -1121,9 +1118,6 @@
     <string name="listen_together_official_server_dialog_message">This party is hosted on the official BitChord server.\n\nDo you want to switch back to the official server and join party %1$s?</string>
     <string name="listen_together_switch_failed_stayed_in_party">Couldn’t join party: %1$s. Remaining in party %2$s.</string>
     <string name="listen_together_switch_failed">Couldn’t join party: %1$s.</string>
-    <string name="audio_pipeline_subtitle">Live signal path, decoder to output</string>
-    <string name="song_added_to_playlist">Added to playlist</string>
-    <string name="song_already_in_playlist">Already in playlist</string>
     <plurals name="songs_added_to_playlist">
         <item quantity="one">Added %1$d song to the playlist</item>
         <item quantity="other">Added %1$d songs to the playlist</item>

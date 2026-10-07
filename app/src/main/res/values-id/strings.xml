@@ -532,9 +532,7 @@
     <string name="replay_songs_start">Secara keseluruhan, </string>
     <string name="replay_summary_start">Riwayat mendengarkan Anda memiliki </string>
     <string name="saved">Disimpan</string>
-    <string name="saved_bang">Tersimpan!</string>
     <string name="share_my_replay">Bagikan Replay saya</string>
-    <string name="share_your_lyrics">Kirim kartu lirikmu</string>
     <string name="share_your_replay">Bagikan Replay Anda</string>
     <string name="tap_share_for_picture">Ketuk Bagikan untuk membuat gambar</string>
     <string name="top_album">Album teratas</string>
@@ -544,7 +542,6 @@
     <string name="when_you_listen_the_most">Saat Anda paling banyak mendengarkan</string>
     <string name="your_biggest_day">Hari terbesar Anda: %1$s</string>
     <string name="your_listening_experience">Pengalaman mendengarkan Anda</string>
-    <string name="your_lyrics_card">Kartu lirikmu</string>
     <string name="your_replay">Replay Anda</string>
     <plurals name="replay_artist_count">
         <item quantity="other">%1$s artis</item>

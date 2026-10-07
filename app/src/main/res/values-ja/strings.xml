@@ -532,9 +532,7 @@
     <string name="replay_songs_start">合計</string>
     <string name="replay_summary_start">あなたの再生スタイルは</string>
     <string name="saved">保存済み</string>
-    <string name="saved_bang">保存しました！</string>
     <string name="share_my_replay">自分のReplayを共有</string>
-    <string name="share_your_lyrics">歌詞カードを送る</string>
     <string name="share_your_replay">あなたのReplayを共有</string>
     <string name="tap_share_for_picture">共有をタップして画像を作成</string>
     <string name="top_album">トップアルバム</string>
@@ -544,7 +542,6 @@
     <string name="when_you_listen_the_most">最もよく聴く時間帯</string>
     <string name="your_biggest_day">最も聴いた日：%1$s</string>
     <string name="your_listening_experience">あなたの再生体験</string>
-    <string name="your_lyrics_card">歌詞カード</string>
     <string name="your_replay">あなたのReplay</string>
     <plurals name="replay_artist_count">
         <item quantity="other">%1$s組のアーティスト</item>

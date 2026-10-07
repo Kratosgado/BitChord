@@ -548,9 +548,7 @@
     <string name="replay_songs_start">कुल मिलाकर, </string>
     <string name="replay_summary_start">आपके सुनने में एक </string>
     <string name="saved">सेव किया गया</string>
-    <string name="saved_bang">सहेजा गया!</string>
     <string name="share_my_replay">मेरा Replay शेयर करें</string>
-    <string name="share_your_lyrics">शब्द कार्ड भेजें</string>
     <string name="share_your_replay">अपना Replay शेयर करें</string>
     <string name="tap_share_for_picture">तस्वीर बनाने के लिए शेयर पर टैप करें</string>
     <string name="top_album">टॉप एल्बम</string>
@@ -560,7 +558,6 @@
     <string name="when_you_listen_the_most">जब आप सबसे ज़्यादा सुनते हैं</string>
     <string name="your_biggest_day">आपका सबसे बड़ा दिन: %1$s</string>
     <string name="your_listening_experience">आपका सुनने का अनुभव</string>
-    <string name="your_lyrics_card">आपका शब्द कार्ड</string>
     <string name="your_replay">आपका Replay</string>
     <plurals name="replay_artist_count">
         <item quantity="one">%1$s कलाकार</item>
