@@ -1639,7 +1639,7 @@ fun NowPlayingScreen(
                         status = lyricsTranslation.status,
                         onChangeProvider = { showLyricsProviders = true },
                         romanizationToggle = {
-                            if (!lyricPicking) {
+                            if (!lyricPicker.picking) {
                                 RomanizationToggleButton(
                                     state = lyricsTranslation.romanizationState,
                                     showingRomanization = lyricsTranslation.showingRomanization,
@@ -1649,7 +1649,7 @@ fun NowPlayingScreen(
                             }
                         },
                         translationToggle = {
-                            if (!lyricPicking) {
+                            if (!lyricPicker.picking) {
                                 TranslationToggleButton(
                                     state = lyricsTranslation.translationState,
                                     showingTranslation = lyricsTranslation.showingTranslation,
@@ -2828,7 +2828,7 @@ fun NowPlayingScreen(
                     // for reading, and a control parked over the words when
                     // nobody asked for the controls is one more thing between
                     // the reader and them.
-                    val translateShown = lyricsPanelVisible && lyricsControlsOpen && !lyricPicking
+                    val translateShown = lyricsPanelVisible && lyricsControlsOpen && !lyricPicker.picking
                     val translateFade by animateFloatAsState(
                         targetValue = if (translateShown) 1f else 0f,
                         animationSpec = tween(if (translateShown) 220 else 160),

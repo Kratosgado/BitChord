@@ -365,28 +365,6 @@ private fun RecentTrackRow(
     onClick: () -> Unit,
     onLongPress: (() -> Unit)?,
 ) {
-    CompactTrackRow(
-        title = item.title,
-        subtitle = item.subtitle,
-        thumbnailUrl = item.thumbnailUrl,
-        onClick = onClick,
-        onLongPress = onLongPress,
-    )
-}
-
-/**
- * One row of Recents' four-to-a-column pager. Public so the desktop artist page
- * can list its top songs the same way.
- */
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-fun CompactTrackRow(
-    title: String,
-    subtitle: String,
-    thumbnailUrl: String?,
-    onClick: () -> Unit,
-    onLongPress: (() -> Unit)?,
-) {
     Row(
         modifier = Modifier
             .fillMaxWidth()

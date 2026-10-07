@@ -26,7 +26,7 @@ class PlaylistCacheRepository(context: Context) {
 
     /** Emits the cached playlist list instantly, then stays live for updates. */
     fun observePlaylists(): Flow<List<UserPlaylist>> =
-        dao.observePlaylists().map { rows -> rows.map(PlaylistEntity::toModel) }
+        dao.observePlaylists().map { rows -> rows.map { it.toModel() } }
 
     /**
      * Returns cached playlists immediately. If the cache is stale (or empty),
@@ -39,7 +39,7 @@ class PlaylistCacheRepository(context: Context) {
         if (forceRefresh || stale || cached.isEmpty()) {
             scope.launch { refreshPlaylists() }
         }
-        return cached.map(PlaylistEntity::toModel)
+        return cached.map { it.toModel() }
     }
 
     suspend fun refreshPlaylists() {

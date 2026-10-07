@@ -2528,17 +2528,6 @@ private fun BitChordApp(
             },
         )
 
-        val playerHost = PlayerPlatform.host as? AndroidPlayerHost
-        if (playerHost != null) {
-            val lyricsShare by playerHost.lyricsShareRequest.collectAsStateWithLifecycle()
-            lyricsShare?.let { request ->
-                LyricsShareSheet(
-                    hazeState = hazeState,
-                    request = request,
-                    onDismiss = { playerHost.dismissLyricsShare() },
-                )
-            }
-        }
     }
 
     Box(
@@ -4645,46 +4634,48 @@ private fun BitChordApp(
                     target = pickerTarget,
                     containingPlaylistIds = containing,
                     startCreating = pickerTarget == null,
-                    onAdd = { picked ->
+                    onAdd = { selectedPlaylists ->
                         when {
                             trackTarget != null -> {
-                                viewModel.addToPlaylists(picked, trackTarget) { added, alreadyThere, failed ->
+                                viewModel.addToPlaylists(selectedPlaylists, trackTarget) { added, alreadyThere, _ ->
                                     showQueueNotice(
-                                        when {
-                                            added > 1 -> context.resources.getQuantityString(
-                                                R.plurals.songs_added_to_playlist, added, added,
-                                            )
-                                            added == 1 -> context.getString(R.string.song_added_to_playlist)
-                                            alreadyThere > 0 && failed == 0 ->
-                                                context.getString(R.string.song_already_in_playlist)
-                                            else -> context.getString(R.string.failed)
-                                        },
+                                        context.getString(
+                                            if (added == 0 && alreadyThere > 0) R.string.song_already_in_playlist
+                                            else R.string.song_added_to_playlist,
+                                        ),
                                     )
                                 }
-                                dismiss()
                             }
                             releaseTarget != null -> {
                                 val songs = playlistBrowseSongs
                                 if (songs.isEmpty()) {
                                     showQueueNotice(context.getString(R.string.no_tracks_here))
                                 } else {
-                                    picked.forEach { playlist ->
-                                        viewModel.addSongsToPlaylist(playlist, songs) { added, duplicates ->
-                                            val message = when {
-                                                added == 0 && duplicates == songs.size ->
-                                                    context.getString(R.string.all_songs_already_in_playlist)
-                                                added == 0 ->
-                                                    context.getString(R.string.song_already_in_playlist)
-                                                duplicates == 0 -> context.resources.getQuantityString(
-                                                    R.plurals.songs_added_to_playlist, added, added,
-                                                )
-                                                else -> context.resources.getQuantityString(
-                                                    R.plurals.songs_added_to_playlist, added, added,
-                                                ) + " · " + context.resources.getQuantityString(
-                                                    R.plurals.songs_already_in_playlist, duplicates, duplicates,
-                                                )
+                                    var completed = 0
+                                    var totalAdded = 0
+                                    var totalAlreadyThere = 0
+                                    songs.forEach { song ->
+                                        viewModel.addToPlaylists(selectedPlaylists, song) { added, alreadyThere, _ ->
+                                            totalAdded += added
+                                            totalAlreadyThere += alreadyThere
+                                            completed++
+                                            if (completed == songs.size) {
+                                                val message = when {
+                                                    totalAdded == 0 && totalAlreadyThere == songs.size * selectedPlaylists.size ->
+                                                        context.getString(R.string.all_songs_already_in_playlist)
+                                                    totalAdded == 0 ->
+                                                        context.getString(R.string.song_already_in_playlist)
+                                                    totalAlreadyThere == 0 -> context.resources.getQuantityString(
+                                                        R.plurals.songs_added_to_playlist, totalAdded, totalAdded,
+                                                    )
+                                                    else -> context.resources.getQuantityString(
+                                                        R.plurals.songs_added_to_playlist, totalAdded, totalAdded,
+                                                    ) + " · " + context.resources.getQuantityString(
+                                                        R.plurals.songs_already_in_playlist, totalAlreadyThere, totalAlreadyThere,
+                                                    )
+                                                }
+                                                showQueueNotice(message)
                                             }
-                                            showQueueNotice(message)
                                         }
                                     }
                                     dismiss()
