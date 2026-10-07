@@ -100,11 +100,11 @@ import java.util.Locale
  * always the fallback for "I meant to do something with this song".
  *
  * Everything that writes to the account is hidden outright when [signedIn] is
- * false rather than shown and refused. The same goes for a track that is
- * playing from a local file or a finished download (`song.localUri != null`):
- * rating, playlists, downloading it again and sharing all assume a YouTube
- * identity the file doesn't carry, so those rows drop out regardless of
- * [signedIn].
+ * false rather than shown and refused. The same goes for a device-library
+ * track whose videoId is a `content://` or `file://` URI — those have no
+ * YouTube identity, so rating, playlists and share-link drop out. A finished
+ * download is treated differently: it came from YouTube and its videoId is
+ * still valid for all account actions.
  *
  * [showSleepTimer] and [onShare] are the player's extras: a sleep timer isn't a
  * property of some row in a list, so it only appears where it means something.
@@ -212,8 +212,13 @@ fun SongActionsSheet(
     }
     val liked = likeStatus == LikeStatus.LIKE
     val disliked = likeStatus == LikeStatus.DISLIKE
-    // A local file or a finished download has no YouTube identity behind it to
-    // rate, save, queue into a playlist, fetch again, or share a link for.
+    // A device-library file (content:// or file:// videoId) has no YouTube
+    // identity: like/dislike, playlists and share-link all need a real videoId.
+    // A *finished download* is different — it came from YouTube and still carries
+    // a valid videoId, so those actions remain available for it.
+    val isDeviceFile = song.videoId.startsWith("content://") || song.videoId.startsWith("file://")
+    // Separate from isDeviceFile: DownloadRow and WebDavUploadRow need to know
+    // whether a local file exists regardless of where the track originated.
     val isOffline = song.localUri != null
 
     val rows: @Composable ColumnScope.() -> Unit = {
@@ -262,7 +267,7 @@ fun SongActionsSheet(
             GroupSeparator(palette)
         }
 
-        if (signedIn && !isOffline) {
+        if (signedIn && !isDeviceFile) {
             ActionRow(
                 icon = if (liked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
                 label = if (liked) stringResource(R.string.remove_from_liked) else stringResource(R.string.like),
@@ -354,7 +359,7 @@ fun SongActionsSheet(
                 onClick = it,
             )
         }
-        if (!isOffline) {
+        if (!isDeviceFile) {
             onShare?.let {
                 ActionRow(Icons.Rounded.Share, stringResource(R.string.share), accent = palette.accent, onClick = it)
             }
