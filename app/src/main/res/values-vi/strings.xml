@@ -451,6 +451,10 @@
     <string name="remove_from_liked">Xóa khỏi Nhạc đã thích</string>
     <string name="remove_from_playlist">Xóa khỏi danh sách phát này</string>
     <string name="rename_playlist">Đổi tên danh sách phát</string>
+    <string name="reorder_songs">Sắp xếp lại bài hát</string>
+    <string name="reorder_failed">Không thể lưu thứ tự mới</string>
+    <string name="playlist_reordered">Đã lưu thứ tự danh sách phát</string>
+    <string name="save_order">Lưu</string>
     <string name="reset_to_default">Đặt lại về mặc định</string>
     <string name="rich_presence_footer">Hiển thị những gì bạn đang nghe trên hồ sơ Discord của bạn.</string>
     <string name="save_name">Lưu tên</string>
@@ -519,6 +523,10 @@
     <string name="hour_pm">%1$d CH</string>
     <string name="hours_minutes_short">%1$d giờ %2$d phút</string>
     <string name="listen_most_around">Bạn nghe nhiều nhất vào khoảng %1$s.</string>
+    <string name="lyrics_share_title">Chia sẻ lời bài hát</string>
+    <string name="lyrics_share_description">Những dòng bạn chọn, được bố trí trên một thẻ cùng ảnh bìa.</string>
+    <string name="lyrics_share_story">Chuyển thành story</string>
+    <string name="lyrics_share_story_revert">Quay lại thẻ</string>
     <string name="listening_shape">Thói quen nghe nhạc của bạn</string>
     <string name="member_since">Thành viên từ</string>
     <string name="member_since_value">Thành viên từ %1$s</string>
@@ -550,6 +558,9 @@
     <string name="replay_minutes_end"> cho âm nhạc.</string>
     <string name="replay_minutes_start">Bạn đã dành </string>
     <string name="replay_minutes_value">%1$s</string>
+    <plurals name="replay_minutes_unit">
+        <item quantity="other">%1$s phút</item>
+    </plurals>
     <string name="replay_mostly_around">, chủ yếu vào khoảng %1$s.</string>
     <string name="replay_private_counting">Được tạo riêng tư từ lịch sử nghe nhạc trên thiết bị này</string>
     <string name="replay_share_card_description">Một tấm thẻ tinh tế với những điểm nổi bật trong gu nghe nhạc của bạn.</string>
@@ -558,16 +569,19 @@
     <string name="replay_songs_start">Tổng cộng, </string>
     <string name="replay_summary_start">Gu âm nhạc của bạn mang phong cách </string>
     <string name="saved">Đã lưu</string>
+    <string name="saved_bang">Đã lưu!</string>
     <string name="share_my_replay">Chia sẻ Replay của tôi</string>
+    <string name="share_your_lyrics">Gửi thẻ lời bài hát</string>
     <string name="share_your_replay">Chia sẻ Replay của bạn</string>
     <string name="tap_share_for_picture">Nhấn Chia sẻ để tạo hình ảnh</string>
     <string name="top_album">Album hàng đầu</string>
     <string name="top_artist">Nghệ sĩ hàng đầu</string>
     <string name="top_genre">Thể loại hàng đầu</string>
     <string name="top_song">Bài hát hàng đầu</string>
-    <string name="when_you_listen_most">Thời điểm bạn nghe nhiều nhất</string>
+    <string name="when_you_listen_the_most">Thời điểm bạn nghe nhiều nhất</string>
     <string name="your_biggest_day">Ngày nghe nhiều nhất: %1$s</string>
     <string name="your_listening_experience">Trải nghiệm nghe nhạc của bạn</string>
+    <string name="your_lyrics_card">Thẻ lời bài hát của bạn</string>
     <string name="your_replay">BitChord Replay của bạn</string>
     <plurals name="replay_artist_count">
         <item quantity="other">%1$s nghệ sĩ</item>
@@ -641,6 +655,8 @@
     <string name="version_cut_aligned">đã khớp</string>
     <string name="automix_enabled_subtitle">Tự động căn thời gian và hòa âm từng đoạn chuyển bài dựa trên bản nhạc. Tắt đi nếu điện thoại nóng lên hoặc nhạc bị giật lag.</string>
     <string name="automix_disabled_subtitle">Tự động căn thời gian và hòa âm đoạn chuyển bài mà không cần thanh trượt. Hiệu năng có thể khác nhau trên các thiết bị yếu hơn.</string>
+    <string name="advanced_automix">Automix nâng cao</string>
+    <string name="advanced_automix_subtitle">Trộn nhạc như DJ: giữ nhịp khớp nhau, chuyển bài đúng phách và cắt giữa những bài không hòa hợp. Không xử lý thêm.</string>
     <string name="no_lyrics_sources_enabled">Không có. Sẽ không tải lời bài hát.</string>
     <string name="song_cache_large_subtitle">Lưu tối đa %1$s âm thanh đã tải trên ổ đĩa. Tùy chọn này có thể chiếm dung lượng đáng kể trong bộ nhớ trống của bạn.</string>
     <string name="song_cache_limit_subtitle">Lưu trữ âm thanh đã tải trên đĩa để tua nhanh và phát lại tức thì</string>
@@ -688,6 +704,7 @@
     <string name="prefer_usb_dac">Ưu tiên DAC USB</string>
     <string name="loudness_normalization">Chuẩn hóa âm lượng</string>
     <string name="loudness_normalization_subtitle">Cân bằng âm lượng giữa các bài hát</string>
+    <string name="loudness_off_on_speaker">Tắt trên loa điện thoại</string>
     <string name="loudness_target">Âm lượng mục tiêu</string>
     <string name="loudness_target_subtitle">Nhỏ hơn hợp với tai nghe; lớn hơn hợp với ô tô hoặc loa điện thoại</string>
     <string name="loudness_target_value">%1$s LUFS</string>
@@ -1116,6 +1133,24 @@
         <item quantity="other">%1$d songs already in the playlist</item>
     </plurals>
     <string name="all_songs_already_in_playlist">All tracks are already in the playlist</string>
+    <string name="cast_dialog_title">Cast</string>
+    <string name="cast_dialog_subtitle">Play on a Chromecast or Google Cast speaker</string>
+    <string name="cast_searching">Looking for devices…</string>
+    <string name="cast_searching_hint">Your phone and the receiver need to be on the same Wi-Fi network.</string>
+    <string name="cast_device_connecting">Connecting…</string>
+    <string name="cast_device_connected">Casting</string>
+    <string name="cast_stop">Stop casting</string>
+    <string name="cast_track_unsupported">This track can\'t be cast</string>
+    <string name="cast_connect_failed">Couldn\'t connect to the receiver</string>
+    <string name="audio_pipeline_subtitle">Live signal path, decoder to output</string>
+    <string name="song_added_to_playlist">Added to playlist</string>
+    <string name="song_already_in_playlist">Already in playlist</string>
+    <plurals name="add_to_playlists_count">
+        <item quantity="other">Thêm vào %1$d danh sách phát</item>
+    </plurals>
+    <plurals name="added_to_playlists_notice">
+        <item quantity="other">Đã thêm vào %1$d danh sách phát</item>
+    </plurals>
     <string name="listen_together_server_online_fallback">Trực tuyến (dự phòng mặc định) · %1$d ms</string>
     <string name="listen_together_ping">%1$d ms</string>
     <string name="listen_together_server_offline_dash">—</string>
@@ -1148,4 +1183,49 @@
         <item quantity="one">%1$d line picked</item>
         <item quantity="other">%1$d lines picked</item>
     </plurals>
+    <string name="source_needs_lossless_output">Cần đầu ra lossless · hãy dùng thiết bị hỗ trợ lossless</string>
+    <string name="source_needs_lossless_bt_codec">Cần đầu ra lossless · Bluetooth đang dùng %1$s; hãy dùng thiết bị hỗ trợ lossless</string>
+    <string name="source_needs_lossless_bt_unknown">Cần đầu ra lossless · không xác định được codec Bluetooth đang dùng</string>
+    <string name="source_downloads_off">Chỉ phát trực tuyến</string>
+    <string name="lossless_output_permission">Kiểm tra codec Bluetooth</string>
+    <string name="lossless_output_permission_detail">Cho phép Thiết bị lân cận để tai nghe LDAC hoặc LHDC mở khóa addon lossless</string>
+    <string name="cached_songs">Bài hát đã lưu bộ nhớ đệm</string>
+    <string name="cached_songs_subtitle">Bài hát từ YouTube và JioSaavn trong bộ nhớ đệm</string>
+    <string name="cached_songs_empty">Chưa có bài hát nào trong bộ nhớ đệm. Bài hát bạn phát từ YouTube hoặc JioSaavn sẽ hiện ở đây.</string>
+    <string name="show_cache_folder">Hiện thư mục bài hát trong bộ nhớ đệm</string>
+    <string name="show_cache_folder_subtitle">Thêm vào Thư viện một thư mục chứa các bài hát YouTube và JioSaavn được lưu trong bộ nhớ đệm</string>
+    <string name="song_cache_unlimited">Không giới hạn</string>
+    <string name="song_cache_unlimited_subtitle">Không giới hạn. Âm thanh trong bộ nhớ đệm có thể tăng cho đến khi đầy bộ nhớ.</string>
+    <string name="clear_song_cache_title">Xóa bộ nhớ đệm bài hát?</string>
+    <string name="clear_song_cache_warning">Tất cả bài hát trong bộ nhớ đệm sẽ bị xóa và thư mục bài hát trong bộ nhớ đệm sẽ trống. Chúng sẽ được phát trực tuyến lại vào lần phát tiếp theo.</string>
+    <string name="import_spotify">Nhập từ Spotify</string>
+    <string name="import_spotify_subtitle">Từ liên kết danh sách phát</string>
+    <string name="local_playlist_subtitle">%1$d bài hát · Trên thiết bị này</string>
+    <string name="lossless_output_permission_denied">Quyền thiết bị gần đang tắt</string>
+    <string name="lossless_output_permission_denied_detail">Nhấn để mở Cài đặt và cho phép Thiết bị gần — thiếu quyền này chúng tôi không đọc được bộ giải mã Bluetooth của bạn</string>
+    <string name="recent_album">Album gần đây</string>
+    <string name="recent_ep">EP gần đây</string>
+    <string name="recent_single">Đơn gần đây</string>
+    <string name="spotify">Spotify</string>
+    <string name="spotify_connect_subtitle">Đăng nhập để tải danh sách phát của bạn. Phát nhạc dùng YouTube Music.</string>
+    <string name="spotify_disconnect">Ngắt kết nối</string>
+    <string name="spotify_empty_playlists">Không có danh sách phát nào trên tài khoản này</string>
+    <string name="spotify_empty_tracks">Danh sách phát này không có bài hát</string>
+    <string name="spotify_import_button">Nhập</string>
+    <string name="spotify_import_description">Dán liên kết danh sách phát công khai. Bài hát được đối chiếu trên YouTube Music.</string>
+    <string name="spotify_import_description_local">Dán liên kết danh sách phát công khai. Bài hát được đối chiếu trên YouTube Music và lưu trên thiết bị này.</string>
+    <string name="spotify_import_done">Đã nhập ‘%1$s’</string>
+    <string name="spotify_import_empty_playlist">Không có bài hát trong danh sách phát này</string>
+    <string name="spotify_import_failed">Không thể nhập danh sách phát: %1$s</string>
+    <string name="spotify_import_fetching">Đang đọc danh sách phát Spotify…</string>
+    <string name="spotify_import_hint">open.spotify.com/playlist/…</string>
+    <string name="spotify_import_invalid">Đó không phải liên kết danh sách phát Spotify.</string>
+    <string name="spotify_import_local_fallback">Không tạo được trên YouTube Music, nên ‘%1$s’ đã được lưu trên thiết bị này.</string>
+    <string name="spotify_import_matching">Đang đối chiếu bài hát %1$d / %2$d</string>
+    <string name="spotify_import_none">Không tìm thấy bài hát nào trong số đó trên YouTube Music.</string>
+    <string name="spotify_import_title">Nhập danh sách phát Spotify</string>
+    <string name="spotify_import_unmatched">%1$d bài hát không tìm thấy trên YouTube Music</string>
+    <string name="spotify_library_subtitle">Danh sách phát Spotify của bạn</string>
+    <string name="spotify_sign_in">Đăng nhập bằng Spotify</string>
+    <string name="spotify_track_unavailable">Không tìm thấy bài hát đó trên YouTube Music</string>
 </resources>

@@ -12,15 +12,22 @@ val appVersion: String = providers.gradleProperty("bitchord.version").orNull
 /** Which platform this build is *for*, which is the host unless told otherwise. */
 val hostIsWindows = System.getProperty("os.name").contains("Windows", ignoreCase = true)
 val hostIsLinux = System.getProperty("os.name").contains("Linux", ignoreCase = true)
+val hostIsMac = System.getProperty("os.name").contains("Mac", ignoreCase = true)
 val targetOs: String = (providers.gradleProperty("bitchord.target").orNull ?: when {
     hostIsWindows -> "windows"
     hostIsLinux -> "linux"
-    else -> error("BitChord desktop supports Linux and Windows only")
+    hostIsMac -> "macos"
+    else -> error("BitChord desktop supports Linux, Windows, and macOS only")
 }).lowercase()
+
+val hostArch = System.getProperty("os.arch").lowercase()
+val isArm64 = hostArch == "aarch64" || hostArch == "arm64"
 
 // Windows installer metadata requires MAJOR.MINOR.BUILD even though the app's public version is
 // intentionally displayed without a patch number (1.7 rather than 1.7.0).
-val nativePackageVersion = if (appVersion.count { it == '.' } == 1) "$appVersion.0" else appVersion
+// The build number is the desktop version code; it also keeps "-beta1" out of the numeric installer version.
+val desktopVersionCode = 29
+val nativePackageVersion = appVersion.substringBefore('-').split('.').take(2).joinToString(".") + ".$desktopVersionCode"
 
 // FFmpeg decodes audio; see DesktopAudioDecoder.
 val javacppVersion = "1.5.12"
@@ -28,7 +35,8 @@ val ffmpegVersion = "7.1.1-$javacppVersion"
 val nativeClassifier = when (targetOs) {
     "windows" -> "windows-x86_64"
     "linux" -> "linux-x86_64"
-    else -> error("BitChord desktop supports Linux and Windows only")
+    "macos" -> if (isArm64) "macosx-arm64" else "macosx-x86_64"
+    else -> error("BitChord desktop supports Linux, Windows, and macOS only")
 }
 private fun localProperty(name: String): String = rootProject.file("local.properties")
     .takeIf { it.isFile }
@@ -57,12 +65,17 @@ plugins {
 dependencies {
     // Already on the classpath through the NewPipe extractor.
     implementation("org.jsoup:jsoup:1.22.2")
+    implementation("com.google.zxing:core:3.5.3")
 
     implementation(project(":shared"))
     implementation(project(":sharedUi"))
     // BotGuard, for the PoTokens YouTube's web clients need: the phone runs it in an Android
     // WebView, the desktop in JavaFX's (WebKit). Per-platform jars carry the natives.
-    val javafxClassifier = if (targetOs == "windows") "win" else "linux"
+    val javafxClassifier = when (targetOs) {
+        "windows" -> "win"
+        "macos" -> if (isArm64) "mac-aarch64" else "mac"
+        else -> "linux"
+    }
     listOf("base", "graphics", "controls", "media", "web").forEach { module ->
         implementation("org.openjfx:javafx-$module:21.0.10:$javafxClassifier")
     }
@@ -92,7 +105,13 @@ dependencies {
     implementation(compose.components.resources)
     implementation(compose.materialIconsExtended)
     // The Skiko runtime rides in on this, and Skiko is per-platform.
-    implementation(if (targetOs == "windows") compose.desktop.windows_x64 else compose.desktop.linux_x64)
+    implementation(
+        when (targetOs) {
+            "windows" -> compose.desktop.windows_x64
+            "macos" -> if (isArm64) compose.desktop.macos_arm64 else compose.desktop.macos_x64
+            else -> compose.desktop.linux_x64
+        }
+    )
 
     implementation("io.ktor:ktor-client-core:3.0.3")
     implementation("io.ktor:ktor-client-cio:3.0.3")
@@ -124,6 +143,10 @@ dependencies {
     implementation("org.graalvm.js:js-language:24.1.2")
 
     testImplementation(kotlin("test"))
+}
+
+tasks.withType<Test> {
+    systemProperty("java.awt.headless", "true")
 }
 
 kotlin {
@@ -349,6 +372,15 @@ tasks.named<ProcessResources>("processResources") {
     }
 }
 
+// Kotlin 2.4 no longer contributes this JVM target's compiler output to Gradle's plain `jar`
+// task in this project. Compose's dev runner and the portable launcher both use that jar, so add
+// the output explicitly instead of producing a resources-only application archive.
+tasks.named<Jar>("jar") {
+    val kotlinClasses = tasks.named<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>("compileKotlin")
+    dependsOn(kotlinClasses)
+    from(kotlinClasses.flatMap { it.destinationDirectory })
+}
+
 /** A Windows build that can be assembled here, since an installer cannot be. */
 val windowsPortableDir = layout.buildDirectory.dir("windows-portable")
 
@@ -414,6 +446,9 @@ val windowsPortableAssemble by tasks.registering {
             ZipFile(jar).use { zip -> zip.getEntry(entry) != null }
         }
         val problems = buildList {
+            if (!holds("com/music/bitchord/desktop/MainKt.class")) {
+                add("the BitChord desktop entry point is missing")
+            }
             if (!holds("androidx/compose/runtime/Composer.class")) {
                 add("the Compose runtime is missing")
             }
@@ -457,6 +492,9 @@ val composeMainClass = "com.music.bitchord.desktop.MainKt"
 
 compose.desktop {
     application {
+        javaHome = javaToolchains.launcherFor(java.toolchain).map {
+            it.metadata.installationPath.asFile.absolutePath
+        }.get()
         mainClass = composeMainClass
         jvmArgs("-Xmx512m")
         jvmArgs("-XX:+UseG1GC", "-XX:G1PeriodicGCInterval=20000", "-XX:G1PeriodicGCSystemLoadThreshold=0")
@@ -480,6 +518,8 @@ compose.desktop {
 
         nativeDistributions {
             targetFormats(
+                TargetFormat.Dmg,
+                TargetFormat.Pkg,
                 TargetFormat.Exe,
                 TargetFormat.Msi,
                 TargetFormat.Deb,
@@ -515,6 +555,19 @@ compose.desktop {
                 "jdk.zipfs",
             )
 
+            macOS {
+                iconFile.set(project.file("packaging/icons/AppIcon.icns"))
+                bundleID = "com.music.bitchord"
+                appCategory = "public.app-category.music"
+                dockName = "BitChord"
+                infoPlist {
+                    extraKeysRawXml = """
+                        <key>NSRequiresAquaSystemAppearance</key>
+                        <false/>
+                    """.trimIndent()
+                }
+            }
+
             linux {
                 iconFile.set(project.file("packaging/icons/AppIcon.png"))
                 menuGroup = "Audio"
@@ -528,7 +581,7 @@ compose.desktop {
                 upgradeUuid = "8f3c1d24-6a2b-4f5e-9c17-2b8d54e0a913"
                 menuGroup = "BitChord"
                 shortcut = true
-                dirChooser = true
+                dirChooser = false
                 perUserInstall = true
             }
         }

@@ -23,11 +23,12 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Public
+import androidx.compose.material.icons.rounded.RadioButtonUnchecked
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -43,6 +44,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
@@ -86,23 +88,19 @@ sealed interface PickerTarget {
  * carries the track with it instead of leaving a new empty playlist behind
  * for the user to add to a second time.
  *
- * [target] is null when the flow started from the Library tab rather than
- * from a track or release, which is the one case where the header has
- * nothing to draw and "New playlist" is the whole point of the sheet.
+ * [song] is null when the flow started from the Library tab rather than from a
+ * track, which is the one case where the header has no track to draw and
+ * "New playlist" is the whole point of the sheet.
  *
- * [containingPlaylistIds] is the set of playlist ids that already hold the
- * target — a track that has already been added to one of the account's
- * playlists is drawn with a check, so the sheet can act as the answer to
- * "which of these is it on" as much as the way to add it to another. For a
- * release target it is the playlists that already hold every track of the
- * release; the picker doesn't attempt a "some tracks are on it" state,
- * which reads as neither yes nor no.
+ * Playlists are ticked rather than picked: one track often belongs in more
+ * than one list, and a sheet that closed on the first tap meant opening it
+ * again for each. [onAdd] gets every ticked playlist at once.
  */
 @Composable
 fun PlaylistPickerSheet(
     playlists: List<UserPlaylist>,
     loading: Boolean,
-    onPick: (UserPlaylist) -> Unit,
+    onAdd: (List<UserPlaylist>) -> Unit,
     onCreate: (String, PlaylistPrivacy) -> Unit,
     modifier: Modifier = Modifier,
     target: PickerTarget? = null,
@@ -110,6 +108,9 @@ fun PlaylistPickerSheet(
     startCreating: Boolean = false,
 ) {
     var creating by remember { mutableStateOf(startCreating) }
+    // By id rather than by value: the list is re-fetched under an open sheet,
+    // and a refreshed row must stay ticked.
+    var selected by remember { mutableStateOf(emptySet<String>()) }
 
     if (creating) {
         NewPlaylistForm(
@@ -177,12 +178,31 @@ fun PlaylistPickerSheet(
                 // it scrolls inside the sheet instead.
                 LazyColumn(Modifier.heightIn(max = 320.dp)) {
                     items(playlists, key = { it.playlistId }) { playlist ->
+                        val ticked = playlist.playlistId in selected
                         PlaylistRow(
                             playlist = playlist,
-                            contained = playlist.playlistId in containingPlaylistIds,
-                            onClick = { onPick(playlist) },
+                            selected = ticked,
+                            onClick = {
+                                selected = if (ticked) selected - playlist.playlistId else selected + playlist.playlistId
+                            },
                         )
                     }
+                }
+                Spacer(Modifier.height(12.dp))
+                Button(
+                    onClick = { onAdd(playlists.filter { it.playlistId in selected }) },
+                    enabled = selected.isNotEmpty(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 22.dp),
+                ) {
+                    Text(
+                        if (selected.isEmpty()) {
+                            stringResource(R.string.add_to_playlist)
+                        } else {
+                            pluralStringResource(R.plurals.add_to_playlists_count, selected.size, selected.size)
+                        },
+                    )
                 }
             }
         }
@@ -191,7 +211,7 @@ fun PlaylistPickerSheet(
 }
 
 @Composable
-private fun PlaylistRow(playlist: UserPlaylist, contained: Boolean, onClick: () -> Unit) {
+private fun PlaylistRow(playlist: UserPlaylist, selected: Boolean, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -227,19 +247,13 @@ private fun PlaylistRow(playlist: UserPlaylist, contained: Boolean, onClick: () 
                 )
             }
         }
-        if (contained) {
-            // Same "not yet / done" vocabulary the release header uses, so the
-            // sheet reads as a list of destinations and their state. Tapping a
-            // checked row is still live: the ViewModel treats a duplicate add
-            // as a no-op and the caller shows an "already in playlist" notice.
-            Spacer(Modifier.width(12.dp))
-            Icon(
-                imageVector = Icons.Rounded.Check,
-                contentDescription = stringResource(R.string.song_already_in_playlist),
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(20.dp),
-            )
-        }
+        Spacer(Modifier.width(12.dp))
+        Icon(
+            imageVector = if (selected) Icons.Rounded.CheckCircle else Icons.Rounded.RadioButtonUnchecked,
+            contentDescription = null,
+            tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(24.dp),
+        )
     }
 }
 

@@ -421,6 +421,10 @@
     <string name="remove_from_liked">पसंदीदा संगीत से हटाएं</string>
     <string name="remove_from_playlist">इस प्लेलिस्ट से हटाएं</string>
     <string name="rename_playlist">प्लेलिस्ट का नाम बदलें</string>
+    <string name="reorder_songs">गानों का क्रम बदलें</string>
+    <string name="reorder_failed">नया क्रम सेव नहीं हो सका</string>
+    <string name="playlist_reordered">प्लेलिस्ट का क्रम सेव हो गया</string>
+    <string name="save_order">सेव करें</string>
     <string name="reset_to_default">डिफ़ॉल्ट पर रीसेट करें</string>
     <string name="rich_presence_footer">अपनी Discord प्रोफ़ाइल पर दिखाएं कि आप क्या चला रहे हैं।</string>
     <string name="save_name">नाम सेव करें</string>
@@ -497,6 +501,10 @@
     <string name="hour_pm">%1$d PM</string>
     <string name="hours_minutes_short">%1$dh %2$dm</string>
     <string name="listen_most_around">आप सबसे ज़्यादा %1$s के आसपास सुनते हैं।</string>
+    <string name="lyrics_share_title">गाने के शब्द साझा करें</string>
+    <string name="lyrics_share_description">आपकी चुनी हुई पंक्तियाँ, कवर के साथ एक कार्ड पर।</string>
+    <string name="lyrics_share_story">स्टोरी बनाएँ</string>
+    <string name="lyrics_share_story_revert">कार्ड पर वापस जाएँ</string>
     <string name="listening_shape">आपके सुनने का पैटर्न</string>
     <string name="member_since">सदस्य बने</string>
     <string name="member_since_value">%1$s से सदस्य</string>
@@ -528,6 +536,10 @@
     <string name="replay_minutes_end"> संगीत के साथ बिताए।</string>
     <string name="replay_minutes_start">आपने बिताए </string>
     <string name="replay_minutes_value">%1$s</string>
+    <plurals name="replay_minutes_unit">
+        <item quantity="one">%1$s मिनट</item>
+        <item quantity="other">%1$s मिनट</item>
+    </plurals>
     <string name="replay_mostly_around">, ज़्यादातर %1$s के आसपास।</string>
     <string name="replay_private_counting">इस डिवाइस पर आपके सुनने के इतिहास से निजी तौर पर तैयार किया गया</string>
     <string name="replay_share_card_description">आपकी मुख्य सुनने की झलकियों के साथ एक पॉलिश्ड कार्ड।</string>
@@ -536,16 +548,19 @@
     <string name="replay_songs_start">कुल मिलाकर, </string>
     <string name="replay_summary_start">आपके सुनने में एक </string>
     <string name="saved">सेव किया गया</string>
+    <string name="saved_bang">सहेजा गया!</string>
     <string name="share_my_replay">मेरा Replay शेयर करें</string>
+    <string name="share_your_lyrics">शब्द कार्ड भेजें</string>
     <string name="share_your_replay">अपना Replay शेयर करें</string>
     <string name="tap_share_for_picture">तस्वीर बनाने के लिए शेयर पर टैप करें</string>
     <string name="top_album">टॉप एल्बम</string>
     <string name="top_artist">टॉप कलाकार</string>
     <string name="top_genre">टॉप शैली</string>
     <string name="top_song">टॉप गाना</string>
-    <string name="when_you_listen_most">जब आप सबसे ज़्यादा सुनते हैं</string>
+    <string name="when_you_listen_the_most">जब आप सबसे ज़्यादा सुनते हैं</string>
     <string name="your_biggest_day">आपका सबसे बड़ा दिन: %1$s</string>
     <string name="your_listening_experience">आपका सुनने का अनुभव</string>
+    <string name="your_lyrics_card">आपका शब्द कार्ड</string>
     <string name="your_replay">आपका Replay</string>
     <plurals name="replay_artist_count">
         <item quantity="one">%1$s कलाकार</item>
@@ -616,6 +631,8 @@
     <string name="version_cut_aligned">अलाइन हो गया</string>
     <string name="automix_enabled_subtitle">ट्रैक्स से खुद हर ट्रांज़िशन का समय और मिश्रण तय करता है। फ़ोन गर्म होने या प्लेबैक अटकने पर इसे बंद कर दें।</string>
     <string name="automix_disabled_subtitle">बिना स्लाइडर के, ट्रांज़िशन का समय और मिश्रण अपने आप तय करता है। धीमे डिवाइस पर परफ़ॉर्मेंस अलग हो सकती है।</string>
+    <string name="advanced_automix">एडवांस्ड ऑटोमिक्स</string>
+    <string name="advanced_automix_subtitle">DJ की तरह मिक्स करता है: बीट्स को मिलाए रखता है, हर बदलाव बीट पर करता है और जो गाने मेल नहीं खाते उनके बीच कट करता है। कोई अतिरिक्त प्रोसेसिंग नहीं।</string>
     <string name="no_lyrics_sources_enabled">कोई नहीं। लिरिक्स नहीं लिए जाएंगे।</string>
     <string name="song_cache_large_subtitle">डिस्क पर %1$s तक डाउनलोड किया गया ऑडियो रखता है। इससे आपकी खाली जगह का एक बड़ा हिस्सा इस्तेमाल हो सकता है।</string>
     <string name="song_cache_limit_subtitle">तुरंत सीक करने और दोबारा सुनने के लिए डाउनलोड किया गया ऑडियो डिस्क पर रखता है</string>
@@ -855,6 +872,7 @@
     <string name="prefer_usb_dac">USB DAC को प्राथमिकता दें</string>
     <string name="loudness_normalization">लाउडनेस नॉर्मलाइज़ेशन</string>
     <string name="loudness_normalization_subtitle">हर ट्रैक को एक जैसी लाउडनेस पर लाता है</string>
+    <string name="loudness_off_on_speaker">फ़ोन स्पीकर पर बंद करें</string>
     <string name="loudness_target">लक्ष्य लाउडनेस</string>
     <string name="loudness_target_subtitle">कम हेडफ़ोन के लिए ठीक है; ज़्यादा कार या फ़ोन स्पीकर के लिए</string>
     <string name="loudness_target_value">%1$s LUFS</string>
@@ -1135,6 +1153,15 @@
 
 
     <string name="audio_pipeline">Audio Pipeline</string>
+    <string name="cast_dialog_title">Cast</string>
+    <string name="cast_dialog_subtitle">Play on a Chromecast or Google Cast speaker</string>
+    <string name="cast_searching">Looking for devices…</string>
+    <string name="cast_searching_hint">Your phone and the receiver need to be on the same Wi-Fi network.</string>
+    <string name="cast_device_connecting">Connecting…</string>
+    <string name="cast_device_connected">Casting</string>
+    <string name="cast_stop">Stop casting</string>
+    <string name="cast_track_unsupported">This track can\'t be cast</string>
+    <string name="cast_connect_failed">Couldn\'t connect to the receiver</string>
     <string name="audio_pipeline_subtitle">डीकोडर से आउटपुट तक लाइव सिग्नल पाथ</string>
 
     <string name="pipeline_track_info">Track Info</string>
@@ -1199,6 +1226,14 @@
         <item quantity="other">%1$d songs already in the playlist</item>
     </plurals>
     <string name="all_songs_already_in_playlist">All tracks are already in the playlist</string>
+    <plurals name="add_to_playlists_count">
+        <item quantity="one">%1$d प्लेलिस्ट में जोड़ें</item>
+        <item quantity="other">%1$d प्लेलिस्ट में जोड़ें</item>
+    </plurals>
+    <plurals name="added_to_playlists_notice">
+        <item quantity="one">%1$d प्लेलिस्ट में जोड़ा गया</item>
+        <item quantity="other">%1$d प्लेलिस्ट में जोड़ा गया</item>
+    </plurals>
     <string name="party_queue_full">कतार भर गई है (पार्टी में अधिकतम %d गाने)</string>
 
     <string name="paxsenix_api_key">PaxSenix API key</string>
@@ -1228,4 +1263,49 @@
         <item quantity="one">%1$d line picked</item>
         <item quantity="other">%1$d lines picked</item>
     </plurals>
+    <string name="source_needs_lossless_output">लॉसलेस आउटपुट चाहिए · लॉसलेस सपोर्ट करने वाला डिवाइस इस्तेमाल करें</string>
+    <string name="source_needs_lossless_bt_codec">लॉसलेस आउटपुट चाहिए · Bluetooth %1$s पर है; लॉसलेस सपोर्ट करने वाला डिवाइस इस्तेमाल करें</string>
+    <string name="source_needs_lossless_bt_unknown">लॉसलेस आउटपुट चाहिए · पता नहीं चल रहा कि कौन-सा Bluetooth कोडेक चल रहा है</string>
+    <string name="source_downloads_off">सिर्फ़ स्ट्रीमिंग</string>
+    <string name="lossless_output_permission">Bluetooth कोडेक जाँचें</string>
+    <string name="lossless_output_permission_detail">आस-पास के डिवाइस की अनुमति दें ताकि LDAC या LHDC हेडफ़ोन लॉसलेस ऐड-ऑन खोल सकें</string>
+    <string name="cached_songs">कैश किए गए गाने</string>
+    <string name="cached_songs_subtitle">सॉन्ग कैश में YouTube और JioSaavn के गाने</string>
+    <string name="cached_songs_empty">अभी कोई कैश किया गया गाना नहीं है। YouTube या JioSaavn से चलाए गए गाने यहाँ दिखेंगे।</string>
+    <string name="show_cache_folder">कैश किए गए गानों का फ़ोल्डर दिखाएँ</string>
+    <string name="show_cache_folder_subtitle">लाइब्रेरी में सॉन्ग कैश में रखे YouTube और JioSaavn गानों का फ़ोल्डर जोड़ता है</string>
+    <string name="song_cache_unlimited">असीमित</string>
+    <string name="song_cache_unlimited_subtitle">कोई सीमा नहीं। कैश ऑडियो स्टोरेज भरने तक बढ़ सकता है।</string>
+    <string name="clear_song_cache_title">सॉन्ग कैश साफ़ करें?</string>
+    <string name="clear_song_cache_warning">सभी कैश किए गए गाने हटा दिए जाएँगे और कैश किए गए गानों का फ़ोल्डर खाली हो जाएगा। अगली बार चलाने पर वे फिर से स्ट्रीम होंगे।</string>
+    <string name="import_spotify">Spotify से आयात करें</string>
+    <string name="import_spotify_subtitle">प्लेलिस्ट लिंक से</string>
+    <string name="local_playlist_subtitle">%1$d गाने · इस डिवाइस पर</string>
+    <string name="lossless_output_permission_denied">नज़दीकी डिवाइस अनुमति बंद है</string>
+    <string name="lossless_output_permission_denied_detail">सेटिंग्स खोलने और नज़दीकी डिवाइस अनुमति देने के लिए टैप करें — इसके बिना आपका ब्लूटूथ कोडेक नहीं पढ़ा जा सकता</string>
+    <string name="recent_album">हाल का एल्बम</string>
+    <string name="recent_ep">हाल की EP</string>
+    <string name="recent_single">हाल का सिंगल</string>
+    <string name="spotify">Spotify</string>
+    <string name="spotify_connect_subtitle">अपनी प्लेलिस्ट लाने के लिए साइन इन करें. प्लेबैक YouTube Music से होता है.</string>
+    <string name="spotify_disconnect">डिस्कनेक्ट</string>
+    <string name="spotify_empty_playlists">इस खाते में कोई प्लेलिस्ट नहीं</string>
+    <string name="spotify_empty_tracks">इस प्लेलिस्ट में कोई गाना नहीं</string>
+    <string name="spotify_import_button">आयात</string>
+    <string name="spotify_import_description">सार्वजनिक प्लेलिस्ट लिंक चिपकाएँ. गाने YouTube Music पर मिलाए जाते हैं.</string>
+    <string name="spotify_import_description_local">सार्वजनिक प्लेलिस्ट लिंक चिपकाएँ. गाने YouTube Music पर मिलाए जाते हैं और इस डिवाइस पर सहेजे जाते हैं.</string>
+    <string name="spotify_import_done">‘%1$s’ आयात हुई</string>
+    <string name="spotify_import_empty_playlist">इस प्लेलिस्ट में कोई गाना नहीं</string>
+    <string name="spotify_import_failed">प्लेलिस्ट आयात नहीं हो सकी: %1$s</string>
+    <string name="spotify_import_fetching">Spotify प्लेलिस्ट पढ़ी जा रही है…</string>
+    <string name="spotify_import_hint">open.spotify.com/playlist/…</string>
+    <string name="spotify_import_invalid">यह Spotify प्लेलिस्ट लिंक नहीं है.</string>
+    <string name="spotify_import_local_fallback">इसे YouTube Music पर नहीं बनाया जा सका, इसलिए ‘%1$s’ इस डिवाइस पर सहेज ली गई.</string>
+    <string name="spotify_import_matching">गाने मिलाए जा रहे हैं %1$d / %2$d</string>
+    <string name="spotify_import_none">वे गाने YouTube Music पर नहीं मिले.</string>
+    <string name="spotify_import_title">Spotify प्लेलिस्ट आयात करें</string>
+    <string name="spotify_import_unmatched">%1$d गाने YouTube Music पर नहीं मिले</string>
+    <string name="spotify_library_subtitle">आपकी Spotify प्लेलिस्ट</string>
+    <string name="spotify_sign_in">Spotify से साइन इन करें</string>
+    <string name="spotify_track_unavailable">वह गाना YouTube Music पर नहीं मिला</string>
 </resources>

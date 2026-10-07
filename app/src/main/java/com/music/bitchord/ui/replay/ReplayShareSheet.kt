@@ -206,8 +206,8 @@ internal fun ShareAction(
     accent: Boolean,
     enabled: Boolean,
     /**
-     * The picture has been written to the gallery: the button turns into a
-     * check and says so, rather than sitting there offering to do it again.
+     * The picture has been written out: the button turns into a check and says
+     * so, rather than sitting there offering to do it again.
      */
     saved: Boolean = false,
     /** What it says once [saved]; falls back to [label] when null. */

@@ -1,5 +1,6 @@
 package com.music.bitchord.desktop
 
+import com.music.bitchord.data.lyrics.LyricsSource
 import com.music.bitchord.data.model.Song
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
@@ -27,11 +28,11 @@ class DesktopPersistence {
     fun saveDislikedIds(ids: Set<String>) = writeLines(KEY_DISLIKED_IDS, ids.toList())
 
     /** Every lyric database, in the order they are asked. */
-    fun lyricsSourceOrder(): List<String> {
-        val known = DesktopLyricsClient.sources.map { it.name }
-        val stored = readNames(DesktopLyricsClient.KEY_LYRICS_ORDER).filter { it in known }
-        return stored + known.filterNot { it in stored }
-    }
+    fun lyricsSourceOrder(): List<String> =
+        // The phone's rule for a saved order meeting a newer build: hidden sources drop out, a new
+        // one slots in beside its declared neighbour.
+        LyricsSource.ordered(readNames(DesktopLyricsClient.KEY_LYRICS_ORDER).mapNotNull(::lyricsSourceNamed))
+            .map { it.label }
 
     fun saveLyricsSourceOrder(names: List<String>) =
         saveString(DesktopLyricsClient.KEY_LYRICS_ORDER, names.joinToString(","))
@@ -104,12 +105,20 @@ class DesktopPersistence {
 
     /** The source list is the desktop equivalent of Android's encrypted SourceRegistry state. */
     internal fun sourceConfigs(): List<DesktopSourceConfig> {
-        val raw = DesktopPreferenceChunks.read(preferences, KEY_SOURCE_CONFIGS)
+        val protected = DesktopPreferenceChunks.read(preferences, KEY_SOURCE_CONFIGS_PROTECTED)
+        val legacy = DesktopPreferenceChunks.read(preferences, KEY_SOURCE_CONFIGS)
+        val raw = if (protected != null) {
+            runCatching { Base64.getDecoder().decode(protected) }.getOrNull()
+                ?.let(DesktopWindowsCrypto::unprotect)
+                ?.toString(StandardCharsets.UTF_8)
+        } else {
+            legacy
+        }
         val stored = raw?.let {
             runCatching { sourceJson.decodeFromString<List<DesktopSourceConfig>>(it) }.getOrNull()
         }
         // Something is stored and could not be read.
-        if (raw != null && stored == null) {
+        if ((raw != null || protected != null) && stored == null) {
             DesktopTrackLog.log("stored sources could not be read; leaving them untouched")
             return listOf(
                 DesktopSourceConfig("jiosaavn", DesktopSourceKind.JIOSAAVN, enabled = sourceEnabled("jiosaavn")),
@@ -140,12 +149,36 @@ class DesktopPersistence {
         val normalized = withBuiltIns.map {
             if (it.kind == DesktopSourceKind.YOUTUBE && !it.enabled) it.copy(enabled = true) else it
         }.inSourceOrder()
-        if (stored == null || normalized != stored) saveSourceConfigs(normalized)
+        if (stored == null || normalized != stored || (DesktopPlatform.isWindows && protected == null)) {
+            saveSourceConfigs(normalized)
+            if (DesktopPlatform.isWindows && stored == null) {
+                DesktopPreferenceChunks.remove(preferences, KEY_MODULE_INDEX_URL)
+            }
+        }
         return normalized
     }
 
     internal fun saveSourceConfigs(configs: List<DesktopSourceConfig>) {
-        DesktopPreferenceChunks.write(preferences, KEY_SOURCE_CONFIGS, sourceJson.encodeToString(configs))
+        val normalized = configs.map { config ->
+            if (config.kind == DesktopSourceKind.ADDON) {
+                config.copy(baseUrl = DesktopAddonClient.normalizeBase(config.baseUrl))
+            } else {
+                config
+            }
+        }
+        val raw = sourceJson.encodeToString(normalized)
+        if (DesktopPlatform.isWindows) {
+            val sealed = DesktopWindowsCrypto.protect(raw.toByteArray(StandardCharsets.UTF_8))
+                ?: error("Windows could not protect the configured source credentials")
+            DesktopPreferenceChunks.write(
+                preferences,
+                KEY_SOURCE_CONFIGS_PROTECTED,
+                Base64.getEncoder().encodeToString(sealed),
+            )
+            DesktopPreferenceChunks.remove(preferences, KEY_SOURCE_CONFIGS)
+        } else {
+            DesktopPreferenceChunks.write(preferences, KEY_SOURCE_CONFIGS, raw)
+        }
     }
 
     /** The stream ceiling in force. */
@@ -272,6 +305,7 @@ class DesktopPersistence {
         private const val KEY_AUDIO_QUALITY = "audio_quality"
         private const val KEY_AUDIO_QUALITY_RUNGS = "audio_quality_rungs"
         const val KEY_SOURCE_CONFIGS = "source_configs"
+        const val KEY_SOURCE_CONFIGS_PROTECTED = "source_configs_dpapi_v1"
         const val MAX_HISTORY = 100
         const val MAX_QUEUE = 200
         const val DELIMITER = "|"

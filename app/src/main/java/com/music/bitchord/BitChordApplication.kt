@@ -105,6 +105,9 @@ class BitChordApplication : Application(), SingletonImageLoader.Factory {
             CoroutineScope(Dispatchers.IO).launch { Innertube.ensureSessionScope() }
         }
         AppSettings.init(this, authStore)
+        // Before anything resolves a track: an addon with `checkValidLossless`
+        // is gated on this, and the gate reads "no" until it has looked.
+        com.music.bitchord.playback.audio.LosslessOutput.init(this)
         // Restores a party this device is still a member of, so a process death
         // mid-session is something the rest of the party never sees. The socket
         // and the clock offset are not restored — both are re-established on
@@ -148,6 +151,8 @@ class BitChordApplication : Application(), SingletonImageLoader.Factory {
         }
         // Initialize LastFM with saved settings if available
         initLastfm()
+        // The public "apps open right now" count; see Presence.
+        com.music.bitchord.data.presence.AndroidPresence.install(this)
         backgroundInit.join()
     }
 

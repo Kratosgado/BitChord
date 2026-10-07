@@ -1,5 +1,6 @@
 # Gradle
 .gradle/
+.vscode/
 /build/
 /app/build/
 /desktopApp/bin/
@@ -42,3 +43,4 @@ keystore.properties
 
 # AI agent configuration
 AGENTS.md
+/output/

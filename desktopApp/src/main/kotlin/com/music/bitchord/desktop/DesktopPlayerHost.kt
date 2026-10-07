@@ -12,13 +12,13 @@ import com.music.bitchord.data.lyrics.LyricsTranslation
 import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.settings.AudioQuality
 import com.music.bitchord.data.settings.LastPlayerScreen
+import com.music.bitchord.data.settings.MixBlend
 import com.music.bitchord.data.settings.SmartAnalysis
 import com.music.bitchord.data.settings.TransitionWindow
 import com.music.bitchord.ui.player.AudioOutputDevice
 import com.music.bitchord.ui.player.AudioOutputKind
 import com.music.bitchord.ui.player.CanvasVideoSpec
 import com.music.bitchord.ui.player.LyricsRomanizationResult
-import com.music.bitchord.ui.player.LyricsShareLinePayload
 import com.music.bitchord.ui.player.LyricsTranslationResult
 import com.music.bitchord.ui.player.MAX_LYRICS_OFFSET_MS
 import com.music.bitchord.ui.player.MIN_LYRICS_OFFSET_MS
@@ -85,7 +85,8 @@ internal object DesktopPlayerHost : PlayerHost {
     @Composable
     override fun rememberAudioOutputs(): List<AudioOutputDevice> {
         val selected by DesktopAudioDevices.selected.collectAsState()
-        val devices = remember { DesktopAudioDevices.available() }
+        val changes by DesktopAudioDevices.changes.collectAsState()
+        val devices = remember(changes) { DesktopAudioDevices.available() }
         return remember(selected, devices) {
             val ids = listOf(DesktopAudioDevices.SYSTEM_DEFAULT) + devices.map { it.id }
             listed = ids
@@ -121,7 +122,15 @@ internal object DesktopPlayerHost : PlayerHost {
         .stateIn(scope, SharingStarted.Eagerly, OutputFormatUi())
 
     override val party: StateFlow<PartyUi> = DesktopListenTogether.state
-        .map { PartyUi(inParty = it.inParty, members = it.members, you = it.you, code = it.code) }
+        .map {
+            PartyUi(
+                inParty = it.inParty,
+                controlsLocked = it.controlsLocked,
+                members = it.members,
+                you = it.you,
+                code = it.code,
+            )
+        }
         .stateIn(scope, SharingStarted.Eagerly, PartyUi())
 
     override suspend fun translateLyrics(
@@ -152,9 +161,6 @@ internal object DesktopPlayerHost : PlayerHost {
     override fun showMessage(message: String) {
         messages.value = message
     }
-
-    // No lyrics-card renderer on the desktop yet; the pick UI simply closes.
-    override fun shareLyrics(song: Song, lines: List<LyricsShareLinePayload>) {}
 
     /** The desktop's signal-chain readout, supplied by the window that has the engine. */
     @Volatile
@@ -189,7 +195,7 @@ internal object DesktopPlayerSettings : PlayerSettingsSource {
     override val lyricsOffsetMs = MutableStateFlow(
         persistence.int(KEY_LYRICS_OFFSET, 0).coerceIn(MIN_LYRICS_OFFSET_MS, MAX_LYRICS_OFFSET_MS),
     )
-    override val lyricsSourceOrder = MutableStateFlow<List<LyricsSource>>(LyricsSource.entries)
+    override val lyricsSourceOrder = MutableStateFlow<List<LyricsSource>>(LyricsSource.offered)
 
     // A desktop is never on a metered link as far as this app can tell.
     override val meteredConnection = MutableStateFlow<Boolean?>(false)
@@ -201,6 +207,7 @@ internal object DesktopPlayerSettings : PlayerSettingsSource {
     override val smartAnalysis = MutableStateFlow(SmartAnalysis())
     override val smartFadeEnabled = MutableStateFlow(false)
     override val smartMixInProgress = MutableStateFlow(false)
+    override val smartMixBlend = MutableStateFlow<MixBlend?>(null)
     override val smartTransitionWindow = MutableStateFlow<TransitionWindow?>(null)
     override val spotifyCanvasAutoHide = MutableStateFlow(true)
     override val syncedLyrics = MutableStateFlow(true)

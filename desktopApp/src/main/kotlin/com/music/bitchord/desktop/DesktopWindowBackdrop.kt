@@ -3,7 +3,7 @@ package com.music.bitchord.desktop
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
-/** The system material behind the window's own chrome — the sidebar, the top bar, the title bar. */
+/** The system material behind the window. */
 internal enum class DesktopBackdrop(
     /** What [DesktopWindowsFrame.setBackdrop] takes: DWM's DWMSBT_* value, or 0 for none. */
     val nativeKind: Int,
@@ -15,12 +15,11 @@ internal enum class DesktopBackdrop(
 }
 
 /**
- * Windows 11's Mica and Acrylic, drawn by DWM behind the sidebar and top bar.
+ * Windows 11's Mica and Acrylic, drawn by DWM behind the window.
  *
- * Only the chrome lets it through: the page, the lyrics and queue column and the player stay
- * opaque, and are painted over it. The window itself is created transparent whenever the material
- * is possible at all — transparency is fixed when the window is made — so switching between the
- * three here is live, with no restart.
+ * The window itself is created transparent whenever the material is possible at all — transparency
+ * is fixed when the window is made — so switching between the three here is live, with no restart.
+ * Compose decides whether the material also reaches the app background via [appBackground].
  */
 internal object DesktopWindowBackdrop {
 
@@ -31,8 +30,9 @@ internal object DesktopWindowBackdrop {
      * start, because it decides whether the window is created transparent.
      */
     val available: Boolean =
-        DesktopPlatform.isWindows && DesktopPlatform.drawsOwnWindowFrame &&
-            System.getProperty("os.name").orEmpty().contains("11")
+        (DesktopPlatform.isWindows && DesktopPlatform.drawsOwnWindowFrame &&
+            System.getProperty("os.name").orEmpty().contains("11")) ||
+        DesktopPlatform.isMac
 
     private val _selected = MutableStateFlow(
         runCatching { DesktopBackdrop.valueOf(DesktopPersistence().string(KEY, DesktopBackdrop.MICA.name)) }
@@ -42,12 +42,19 @@ internal object DesktopWindowBackdrop {
     /** What Settings shows and writes. */
     val selected: StateFlow<DesktopBackdrop> = _selected
 
+    private val _appBackground = MutableStateFlow(
+        DesktopPersistence().boolean(KEY_APP_BACKGROUND, true),
+    )
+
+    /** Whether the selected material replaces the app's solid gray page background too. */
+    val appBackground: StateFlow<Boolean> = _appBackground
+
     private val _active = MutableStateFlow(DesktopBackdrop.OFF)
 
     /**
      * The material actually behind the window right now. Off until the native frame is installed,
-     * and off if Windows turned the request down (a Windows 11 build before 22H2 has no backdrop
-     * attribute): the chrome only goes translucent over a material that is really there.
+     * and off if Windows or macOS turned the request down: the chrome only goes translucent over
+     * a material that is really there.
      */
     val active: StateFlow<DesktopBackdrop> = _active
 
@@ -57,14 +64,25 @@ internal object DesktopWindowBackdrop {
         apply()
     }
 
-    /** Asks DWM for the selected material; called once the native frame is in place, and on every change. */
+    fun setAppBackground(value: Boolean) {
+        DesktopPersistence().saveBoolean(KEY_APP_BACKGROUND, value)
+        _appBackground.value = value
+    }
+
+    /** Asks the native frame for the selected material; called once in place, and on every change. */
     fun apply() {
         if (!available) return
         val wanted = _selected.value
-        val applied = DesktopWindowsFrame.setBackdrop(wanted.nativeKind)
+        val applied = when {
+            DesktopPlatform.isWindows -> DesktopWindowsFrame.setBackdrop(wanted.nativeKind)
+            DesktopPlatform.isMac -> DesktopMacFrame.setBackdrop(wanted.nativeKind)
+            else -> false
+        }
         _active.value = if (applied) wanted else DesktopBackdrop.OFF
         if (!applied && wanted != DesktopBackdrop.OFF) {
-            DesktopTrackLog.log("window backdrop: Windows declined ${wanted.label}")
+            DesktopTrackLog.log("window backdrop: system declined ${wanted.label}")
         }
     }
+
+    internal const val KEY_APP_BACKGROUND = "window_backdrop_app_background"
 }

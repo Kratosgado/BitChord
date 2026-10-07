@@ -235,7 +235,7 @@ private fun drawHabits(canvas: Canvas, context: Context, type: Fonts, summary: R
         )
     }
     summary.peakHour?.let {
-        stat(formatHour(context, it), context.getString(R.string.when_you_listen_most))
+        stat(formatHour(context, it), context.getString(R.string.when_you_listen_the_most))
     }
 }
 
@@ -288,10 +288,11 @@ private fun drawCollage(
  * player's backdrop uses, at a size where the radii can simply be written down
  * instead of derived from a layout.
  *
- * [height] is the canvas it is being drawn on: the poster passes the full frame,
- * a card that grows with its own contents passes whatever it turned out to be.
- * The anchors are fractions of it, so a short card gets the same composition
- * squeezed into its rows rather than the bottom half of a poster left blank.
+ * [height] is the canvas it is being drawn on: the poster passes the full
+ * frame, a card that grows with its own contents passes whatever it turned out
+ * to be. The anchors are fractions of it, so a short card gets the same
+ * composition squeezed into its rows rather than the bottom half of a poster
+ * left blank.
  */
 internal fun drawBackdrop(
     canvas: Canvas,
@@ -349,7 +350,7 @@ internal fun drawBackdrop(
  * same treatment `MeshGradient` gives its own palette, restated here because
  * this runs nowhere near a composition.
  */
-private fun paletteOf(bitmap: Bitmap?): List<Int> {
+internal fun paletteOf(bitmap: Bitmap?): List<Int> {
     val fallback = listOf(0xFF3A1C71.toInt(), 0xFFD76D77.toInt(), 0xFF2B5876.toInt(), 0xFFFFAF7B.toInt())
     val source = bitmap ?: return fallback
     val swatches = runCatching {
@@ -397,7 +398,7 @@ private fun drawHeader(
 ): Float {
     val label = summary.localizedLabel(context)
     val title = if (label.length == 4 && label.all { it.isDigit() }) {
-        "Replay'${label.takeLast(2)}"
+        "Replay ${label.takeLast(2)}"
     } else {
         "Replay · $label"
     }
