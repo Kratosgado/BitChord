@@ -4645,43 +4645,49 @@ private fun BitChordApp(
                     target = pickerTarget,
                     containingPlaylistIds = containing,
                     startCreating = pickerTarget == null,
-                    onPick = { playlist ->
+                    onAdd = { picked ->
                         when {
                             trackTarget != null -> {
-                                viewModel.addToPlaylist(playlist, trackTarget) { alreadyInPlaylist ->
+                                viewModel.addToPlaylists(picked, trackTarget) { added, alreadyThere, failed ->
                                     showQueueNotice(
-                                        context.getString(
-                                            if (alreadyInPlaylist) R.string.song_already_in_playlist
-                                            else R.string.song_added_to_playlist,
-                                        ),
+                                        when {
+                                            added > 1 -> context.resources.getQuantityString(
+                                                R.plurals.songs_added_to_playlist, added, added,
+                                            )
+                                            added == 1 -> context.getString(R.string.song_added_to_playlist)
+                                            alreadyThere > 0 && failed == 0 ->
+                                                context.getString(R.string.song_already_in_playlist)
+                                            else -> context.getString(R.string.failed)
+                                        },
                                     )
                                 }
-                                // The sheet stays up — adding to more than one
-                                // playlist is one motion now, not one motion
-                                // repeated.
+                                dismiss()
                             }
                             releaseTarget != null -> {
                                 val songs = playlistBrowseSongs
                                 if (songs.isEmpty()) {
                                     showQueueNotice(context.getString(R.string.no_tracks_here))
                                 } else {
-                                    viewModel.addSongsToPlaylist(playlist, songs) { added, duplicates ->
-                                        val message = when {
-                                            added == 0 && duplicates == songs.size ->
-                                                context.getString(R.string.all_songs_already_in_playlist)
-                                            added == 0 ->
-                                                context.getString(R.string.song_already_in_playlist)
-                                            duplicates == 0 -> context.resources.getQuantityString(
-                                                R.plurals.songs_added_to_playlist, added, added,
-                                            )
-                                            else -> context.resources.getQuantityString(
-                                                R.plurals.songs_added_to_playlist, added, added,
-                                            ) + " · " + context.resources.getQuantityString(
-                                                R.plurals.songs_already_in_playlist, duplicates, duplicates,
-                                            )
+                                    picked.forEach { playlist ->
+                                        viewModel.addSongsToPlaylist(playlist, songs) { added, duplicates ->
+                                            val message = when {
+                                                added == 0 && duplicates == songs.size ->
+                                                    context.getString(R.string.all_songs_already_in_playlist)
+                                                added == 0 ->
+                                                    context.getString(R.string.song_already_in_playlist)
+                                                duplicates == 0 -> context.resources.getQuantityString(
+                                                    R.plurals.songs_added_to_playlist, added, added,
+                                                )
+                                                else -> context.resources.getQuantityString(
+                                                    R.plurals.songs_added_to_playlist, added, added,
+                                                ) + " · " + context.resources.getQuantityString(
+                                                    R.plurals.songs_already_in_playlist, duplicates, duplicates,
+                                                )
+                                            }
+                                            showQueueNotice(message)
                                         }
-                                        showQueueNotice(message)
                                     }
+                                    dismiss()
                                 }
                             }
                             else -> Unit
