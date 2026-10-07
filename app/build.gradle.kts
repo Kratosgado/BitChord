@@ -60,7 +60,7 @@ val betaSuffix = rootProject.extra["bitchordBetaSuffix"] as String
 val appVersion: String = providers.gradleProperty("bitchord.version").orNull
     ?.removePrefix("v")
     ?.takeIf { it.isNotBlank() }
-    ?: "1.8.3"
+    ?: "1.9.0"
 
 android {
     namespace = "com.music.bitchord"
