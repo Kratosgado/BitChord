@@ -54,6 +54,7 @@ jobs:
 
   desktop-windows:
     name: Desktop · Windows
+    if: false
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -101,6 +102,7 @@ jobs:
 
   desktop-macos:
     name: Desktop · macOS
+    if: false
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4

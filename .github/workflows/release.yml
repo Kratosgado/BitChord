@@ -89,6 +89,7 @@ jobs:
 
   windows:
     name: Windows · installer, msi, portable
+    if: false
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -161,6 +162,7 @@ jobs:
 
   macos:
     name: macOS · dmg, pkg, zip (${{ matrix.arch }})
+    if: false
     strategy:
       matrix:
         include:
@@ -229,7 +231,7 @@ jobs:
 
   release:
     name: Publish
-    needs: [linux, windows, macos]
+    needs: [linux]
     if: always() && needs.linux.result == 'success'
     runs-on: ubuntu-latest
     steps:
