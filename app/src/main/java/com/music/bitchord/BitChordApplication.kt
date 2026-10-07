@@ -32,6 +32,7 @@ import com.music.bitchord.data.settings.SearchHistory
 import com.music.bitchord.data.sources.SourceRegistry
 import com.music.bitchord.data.stats.ArtistFacts
 import com.music.bitchord.data.stats.ListeningStats
+import com.music.bitchord.data.db.QueueDrainWorker
 import com.music.bitchord.download.Downloads
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -153,6 +154,8 @@ class BitChordApplication : Application(), SingletonImageLoader.Factory {
         initLastfm()
         // The public "apps open right now" count; see Presence.
         com.music.bitchord.data.presence.AndroidPresence.install(this)
+        // Drain any actions queued while the device was offline.
+        QueueDrainWorker.enqueue(this)
         backgroundInit.join()
     }
 

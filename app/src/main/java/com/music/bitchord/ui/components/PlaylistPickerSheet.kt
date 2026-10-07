@@ -112,6 +112,14 @@ fun PlaylistPickerSheet(
     // and a refreshed row must stay ticked.
     var selected by remember { mutableStateOf(emptySet<String>()) }
 
+    // Pre-tick playlists that already contain the target so the user can see
+    // which lists have it. Runs again if the background membership fetch
+    // completes after the sheet is already open (adds but never removes
+    // user-explicit ticks so a tap mid-load is not silently undone).
+    LaunchedEffect(containingPlaylistIds) {
+        selected = selected + containingPlaylistIds
+    }
+
     if (creating) {
         NewPlaylistForm(
             // Nowhere to go back to when the sheet opened straight onto the
@@ -179,28 +187,36 @@ fun PlaylistPickerSheet(
                 LazyColumn(Modifier.heightIn(max = 320.dp)) {
                     items(playlists, key = { it.playlistId }) { playlist ->
                         val ticked = playlist.playlistId in selected
+                        val alreadyAdded = playlist.playlistId in containingPlaylistIds
                         PlaylistRow(
                             playlist = playlist,
                             selected = ticked,
+                            alreadyAdded = alreadyAdded,
                             onClick = {
                                 selected = if (ticked) selected - playlist.playlistId else selected + playlist.playlistId
                             },
                         )
                     }
                 }
+                // Only playlists the user explicitly ticked that don't already
+                // contain the target; already-there ones are pre-ticked for
+                // visibility but excluded from the actual add call.
+                val newlySelected = playlists.filter {
+                    it.playlistId in selected && it.playlistId !in containingPlaylistIds
+                }
                 Spacer(Modifier.height(12.dp))
                 Button(
-                    onClick = { onAdd(playlists.filter { it.playlistId in selected }) },
-                    enabled = selected.isNotEmpty(),
+                    onClick = { onAdd(newlySelected) },
+                    enabled = newlySelected.isNotEmpty(),
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 22.dp),
                 ) {
                     Text(
-                        if (selected.isEmpty()) {
+                        if (newlySelected.isEmpty()) {
                             stringResource(R.string.add_to_playlist)
                         } else {
-                            pluralStringResource(R.plurals.add_to_playlists_count, selected.size, selected.size)
+                            pluralStringResource(R.plurals.add_to_playlists_count, newlySelected.size, newlySelected.size)
                         },
                     )
                 }
@@ -211,7 +227,12 @@ fun PlaylistPickerSheet(
 }
 
 @Composable
-private fun PlaylistRow(playlist: UserPlaylist, selected: Boolean, onClick: () -> Unit) {
+private fun PlaylistRow(
+    playlist: UserPlaylist,
+    selected: Boolean,
+    alreadyAdded: Boolean,
+    onClick: () -> Unit,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -248,10 +269,17 @@ private fun PlaylistRow(playlist: UserPlaylist, selected: Boolean, onClick: () -
             }
         }
         Spacer(Modifier.width(12.dp))
+        // Muted tint when the track is already in this playlist so the user
+        // can distinguish "already here" from "just ticked".
+        val checkTint = when {
+            selected && alreadyAdded -> MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
+            selected -> MaterialTheme.colorScheme.primary
+            else -> MaterialTheme.colorScheme.onSurfaceVariant
+        }
         Icon(
             imageVector = if (selected) Icons.Rounded.CheckCircle else Icons.Rounded.RadioButtonUnchecked,
             contentDescription = null,
-            tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            tint = checkTint,
             modifier = Modifier.size(24.dp),
         )
     }

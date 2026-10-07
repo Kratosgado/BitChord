@@ -6,6 +6,7 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization")
+    id("com.google.devtools.ksp")
 }
 
 /**
@@ -402,6 +403,15 @@ dependencies {
     // turn into a real stream — see [com.music.bitchord.playback.cast.CastPlayback].
     implementation("com.google.android.gms:play-services-cast-framework:22.2.0")
     implementation("androidx.mediarouter:mediarouter:1.8.1")
+
+    // ---- Local persistence: playlist cache + offline action queue ----
+    val roomVersion = "2.7.1"
+    implementation("androidx.room:room-runtime:$roomVersion")
+    implementation("androidx.room:room-ktx:$roomVersion")
+    ksp("androidx.room:room-compiler:$roomVersion")
+
+    // ---- Background work: offline queue drain on network recovery ----
+    implementation("androidx.work:work-runtime-ktx:2.10.1")
 
     testImplementation("junit:junit:4.13.2")
     // A real HTTP server for the addon tests. The addon protocol is entirely

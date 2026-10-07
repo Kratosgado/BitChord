@@ -10,7 +10,15 @@ import com.music.bitchord.auth.YouTubeProfile
 import com.music.bitchord.auth.profileId
 import com.music.bitchord.auth.sessionId
 import com.music.bitchord.auth.adjacentProfile
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import com.music.bitchord.data.AppUpdateChecker
+import com.music.bitchord.data.db.PendingActionDao
+import com.music.bitchord.data.db.PendingActionEntity
+import com.music.bitchord.data.db.PendingActionStatus
+import com.music.bitchord.data.db.PendingActionType
+import com.music.bitchord.data.db.BitChordDatabase
+import com.music.bitchord.data.db.PlaylistCacheRepository
 import com.music.bitchord.data.LocalMediaRepository
 import com.music.bitchord.data.LikeState
 import com.music.bitchord.data.YtMusicRepository
@@ -95,6 +103,17 @@ import java.util.concurrent.atomic.AtomicLong
 enum class SearchSource { YOUTUBE, LIBRARY }
 
 class MainViewModel(app: Application) : AndroidViewModel(app) {
+
+    private val playlistCache = PlaylistCacheRepository(app)
+    private val pendingActionDao: PendingActionDao = BitChordDatabase.get(app).pendingActionDao()
+
+    private fun isNetworkAvailable(): Boolean {
+        val cm = getApplication<Application>()
+            .getSystemService(ConnectivityManager::class.java) ?: return true
+        val caps = cm.getNetworkCapabilities(cm.activeNetwork) ?: return false
+        return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+            caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+    }
 
     private val authStore = AuthStore(app)
 
@@ -864,54 +883,66 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val playlistSongs: StateFlow<Map<String, Set<String>>> = _playlistSongs.asStateFlow()
 
     /**
-     * Fetches every playlist's track list once, so the picker can mark the
-     * rows the current target already sits on. Cheap for playlists whose page
-     * is already open ([_detailStack] seeds them without a request), a
-     * capped fan-out otherwise so a shelf of dozens can't fire dozens of
-     * requests at once.
+     * Ensures membership data is available for every playlist in [playlists].
+     *
+     * Serves from the local DB cache immediately for playlists whose data is
+     * fresh, so the picker renders with checks already correct. Triggers
+     * background network fetches only for playlists whose cache is stale or
+     * missing (capped at 3 concurrent). Also seeds from any playlist page
+     * already open in the detail stack for free.
      */
     fun preloadPlaylistMembership(playlists: List<UserPlaylist>) {
         if (!_signedIn.value) return
-        val cache = _playlistSongs.value
-        val missing = playlists.filter { it.playlistId !in cache && it.browseId != null }
-        if (missing.isEmpty()) return
-        // Seed from any playlist page already loaded, so the picker doesn't
-        // ask for what the app already has.
-        val seeded = _playlistSongs.value.toMutableMap()
-        for (playlist in missing) {
-            val id = playlist.browseId ?: continue
-            val open = (_detailStack.value.firstOrNull { it.browseId == id }?.songs as? UiState.Success)?.data
-            if (open != null) seeded[playlist.playlistId] = open.mapTo(HashSet()) { it.videoId }
-        }
-        _playlistSongs.value = seeded
-        val toFetch = missing.filter { it.playlistId !in seeded }
-        if (toFetch.isEmpty()) return
         viewModelScope.launch {
-            val limiter = Semaphore(3)
-            coroutineScope {
-                toFetch.forEach { playlist ->
-                    val browseId = playlist.browseId ?: return@forEach
-                    launch {
-                        val songs = limiter.withPermit {
-                            YtMusicRepository.allSongs(browseId).getOrNull()
-                        } ?: return@launch
-                        _playlistSongs.value = _playlistSongs.value.toMutableMap().apply {
-                            put(playlist.playlistId, songs.mapTo(HashSet()) { it.videoId })
-                        }
-                    }
+            // Seed _playlistSongs from the local DB for all playlists at once —
+            // this is instant and makes the picker render with correct checks
+            // before any network call completes.
+            val fromDb = _playlistSongs.value.toMutableMap()
+            for (playlist in playlists) {
+                if (playlist.playlistId in fromDb) continue
+                // Prefer an already-open page for free; fall back to the DB.
+                val openSongs = (_detailStack.value
+                    .firstOrNull { it.browseId == playlist.browseId }
+                    ?.songs as? UiState.Success)?.data
+                val ids: Set<String> = if (openSongs != null) {
+                    openSongs.mapTo(HashSet()) { it.videoId }
+                } else {
+                    playlistCache.getVideoIds(playlist.playlistId)
                 }
+                fromDb[playlist.playlistId] = ids
             }
+            _playlistSongs.value = fromDb
+
+            // Background: fetch and cache membership for stale playlists.
+            playlistCache.preloadMembership(playlists)
         }
     }
 
-    /** Re-fetched rather than cached for the session: playlists are edited here. */
+    /**
+     * Serves playlists from the local cache immediately, then refreshes from
+     * the network in the background if the cache is stale (>30 min old) or
+     * empty. The UI sees the cached list instantly and updates again when the
+     * refresh completes.
+     */
     fun loadPlaylists() {
         if (!_signedIn.value || _playlistsLoading.value) return
         val identity = listenerKey()
-        _playlistsLoading.value = true
         viewModelScope.launch {
-            YtMusicRepository.userPlaylists().onSuccess { if (identity == listenerKey()) _playlists.value = it }
-            if (identity == listenerKey()) _playlistsLoading.value = false
+            val cached = playlistCache.getPlaylists()
+            if (cached.isNotEmpty() && identity == listenerKey()) {
+                _playlists.value = cached
+            }
+            // getPlaylists() already fires a background refresh when stale, but
+            // we also want to show the loading indicator while a forced refresh
+            // is in flight for an empty cache.
+            if (cached.isEmpty()) {
+                _playlistsLoading.value = true
+                playlistCache.refreshPlaylists()
+                if (identity == listenerKey()) {
+                    _playlists.value = playlistCache.getPlaylists(forceRefresh = false)
+                    _playlistsLoading.value = false
+                }
+            }
         }
     }
 
@@ -996,6 +1027,30 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     ) {
         if (!requireSignIn() || playlists.isEmpty()) return
         viewModelScope.launch {
+            if (!isNetworkAvailable()) {
+                val now = System.currentTimeMillis()
+                var queued = 0
+                playlists.forEach { playlist ->
+                    val alreadyQueued = pendingActionDao.pendingAndInFlight().any {
+                        it.actionType == PendingActionType.ADD_TO_PLAYLIST &&
+                            it.videoId == song.videoId &&
+                            it.playlistId == playlist.playlistId
+                    }
+                    if (!alreadyQueued) {
+                        pendingActionDao.enqueue(
+                            PendingActionEntity(
+                                actionType = PendingActionType.ADD_TO_PLAYLIST,
+                                videoId = song.videoId,
+                                playlistId = playlist.playlistId,
+                                queuedAt = now + queued, // preserve order
+                            )
+                        )
+                        queued++
+                    }
+                }
+                onResult(0, 0, 0) // caller shows its own "queued offline" notice
+                return@launch
+            }
             val outcomes = playlists.map { addOne(it, song) }
             onResult(
                 outcomes.count { it == AddOutcome.ADDED },
@@ -1008,18 +1063,32 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private enum class AddOutcome { ADDED, ALREADY_THERE, FAILED }
 
     private suspend fun addOne(playlist: UserPlaylist, song: Song): AddOutcome {
-        val openSongs = (_detailStack.value.firstOrNull { it.browseId == playlist.browseId }
-            ?.songs as? UiState.Success)?.data
-        val known = openSongs
-            ?: YtMusicRepository.allSongs(playlist.browseId).getOrNull()
-        if (known?.any { it.videoId == song.videoId } == true) return AddOutcome.ALREADY_THERE
+        // Check the in-memory map first (already populated from DB or network
+        // by preloadPlaylistMembership). If the track is already there, skip.
+        val memIds = _playlistSongs.value[playlist.playlistId]
+        val alreadyKnown = if (memIds != null) {
+            memIds.contains(song.videoId)
+        } else {
+            // No in-memory entry: check an open page, then the DB cache, and
+            // finally fall back to a live network fetch for stale/missing data.
+            val openSongs = (_detailStack.value
+                .firstOrNull { it.browseId == playlist.browseId }
+                ?.songs as? UiState.Success)?.data
+            openSongs?.any { it.videoId == song.videoId }
+                ?: (song.videoId in playlistCache.getVideoIds(playlist.playlistId))
+                .also { /* getVideoIds already triggers a background refresh */ }
+        }
+        if (alreadyKnown) return AddOutcome.ALREADY_THERE
+
         return YtMusicRepository.addToPlaylist(playlist.playlistId, listOf(song.videoId)).fold(
             onSuccess = { added ->
                 libraryStale = true
-                // The playlist's page may be open behind the picker — it is
-                // reachable from a row's own menu on it — so the track goes
-                // into it for the same reason [addSuggestedSong] does.
                 appendToOpenPlaylist(playlist.browseId, song, added[song.videoId])
+                // Keep local DB and in-memory map in sync without a re-fetch.
+                playlistCache.recordTrackAdded(playlist.playlistId, song.videoId)
+                _playlistSongs.value = _playlistSongs.value.toMutableMap().apply {
+                    put(playlist.playlistId, (get(playlist.playlistId) ?: emptySet()) + song.videoId)
+                }
                 AddOutcome.ADDED
             },
             onFailure = { AddOutcome.FAILED },
@@ -1064,6 +1133,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     // newest, which is the order the feed itself comes in.
                     _playlists.value = listOf(created) +
                         _playlists.value.filterNot { it.playlistId == created.playlistId }
+                    playlistCache.invalidatePlaylists()
                     editPlaylistShelf { items ->
                         listOf(
                             ShelfItem(
@@ -1264,6 +1334,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 onSuccess = {
                     setPlaylistTitle(playlist, name)
                     libraryStale = true
+                    playlistCache.invalidatePlaylists()
                 },
                 onFailure = {},
             )
@@ -1323,6 +1394,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 onSuccess = {
                     _playlists.value = _playlists.value
                         .filterNot { it.playlistId == playlist.playlistId }
+                    playlistCache.removePlaylistFromCache(playlist.playlistId)
                     // The card in the library tab, which is the surface the
                     // deletion was almost certainly ordered from — and which the
                     // re-fetch that used to stand in for this left in place; see
