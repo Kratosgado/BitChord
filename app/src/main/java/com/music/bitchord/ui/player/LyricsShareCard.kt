@@ -5,7 +5,6 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
-import com.music.bitchord.data.model.Song
 import com.music.bitchord.ui.replay.Fonts
 import com.music.bitchord.ui.replay.drawArtwork
 import com.music.bitchord.ui.replay.drawBackdrop
@@ -15,57 +14,6 @@ import com.music.bitchord.ui.replay.loadBitmap
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-
-/**
- * One picked passage, as the string that goes on the card.
- *
- * Held as text rather than as [com.music.bitchord.data.lyrics.LyricLine] because
- * the card has no idea what a line's timing is: it is handed what the reader was
- * looking at, translation and all, and nothing else.
- *
- * @property subText The romanization or translation drawn small underneath, or
- * null when the panel was showing the original alone.
- * @property isGap A stand-in for the lines skipped between two picked ones,
- * drawn as a centred ellipsis rather than as words.
- */
-internal data class LyricsShareLine(
-    val text: String,
-    val subText: String?,
-    val isGap: Boolean = false,
-)
-
-/** Everything [renderLyricsShareCard] needs, gathered once by the player. */
-internal data class LyricsShareCard(
-    val song: Song,
-    /** Resolved sleeve — remote URL or local file, whatever the player found. */
-    val artworkUrl: String?,
-    val lines: List<LyricsShareLine>,
-)
-
-/**
- * How much text one card is allowed to hold: the picked words, in characters.
- *
- * About five short lines — the point where the size ladder still lands near its
- * top rung and the type stays big enough to read in a chat without pinching.
- * Past it the only ways to keep going would be to shrink the type or to grow
- * the card past the 9:16 it is meant to be, so the player stops the pick
- * instead: the line is not added, and the bar says why. Nothing already picked
- * is ever dropped.
- */
-internal const val SHARE_CARD_CHAR_BUDGET = 250
-
-/**
- * Whether a line of [text] can still join a card already holding [taken]
- * characters — the whole of the rule the player enforces at the pick.
- *
- * Only the words are counted. The translation or romanization drawn under each
- * line rides along and costs the card height, which the ladder pays for by
- * taking a rung or two; counting it here instead would make the same five lines
- * pickable or not depending on a toggle that has nothing to do with how long
- * the verse is.
- */
-internal fun fitsOnCard(taken: Int, text: String?): Boolean =
-    taken + (text?.length ?: 0) <= SHARE_CARD_CHAR_BUDGET
 
 /**
  * The picked lines as one picture, drawn to a bitmap you can send.
