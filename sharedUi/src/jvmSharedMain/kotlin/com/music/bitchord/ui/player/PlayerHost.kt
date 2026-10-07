@@ -12,8 +12,6 @@ import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.settings.AudioQuality
 import com.music.bitchord.data.settings.LastPlayerScreen
 import com.music.bitchord.data.settings.SmartAnalysis
-import com.music.bitchord.data.settings.TransitionWindow
-import dev.chrisbanes.haze.HazeState
 import com.music.bitchord.data.settings.MixBlend
 import com.music.bitchord.data.settings.TransitionWindow
 import dev.chrisbanes.haze.HazeState

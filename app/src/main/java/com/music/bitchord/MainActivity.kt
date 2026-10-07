@@ -2439,17 +2439,6 @@ private fun BitChordApp(
             },
         )
 
-        val playerHost = PlayerPlatform.host as? AndroidPlayerHost
-        if (playerHost != null) {
-            val lyricsShare by playerHost.lyricsShareRequest.collectAsStateWithLifecycle()
-            lyricsShare?.let { request ->
-                LyricsShareSheet(
-                    hazeState = hazeState,
-                    request = request,
-                    onDismiss = { playerHost.dismissLyricsShare() },
-                )
-            }
-        }
     }
 
     Box(
@@ -4441,42 +4430,49 @@ private fun BitChordApp(
                     target = pickerTarget,
                     containingPlaylistIds = containing,
                     startCreating = pickerTarget == null,
-                    onPick = { playlist ->
+                    onAdd = { selectedPlaylists ->
                         when {
                             trackTarget != null -> {
-                                viewModel.addToPlaylist(playlist, trackTarget) { alreadyInPlaylist ->
+                                viewModel.addToPlaylists(selectedPlaylists, trackTarget) { added, alreadyThere, _ ->
                                     showQueueNotice(
                                         context.getString(
-                                            if (alreadyInPlaylist) R.string.song_already_in_playlist
+                                            if (added == 0 && alreadyThere > 0) R.string.song_already_in_playlist
                                             else R.string.song_added_to_playlist,
                                         ),
                                     )
                                 }
-                                // The sheet stays up — adding to more than one
-                                // playlist is one motion now, not one motion
-                                // repeated.
                             }
                             releaseTarget != null -> {
                                 val songs = playlistBrowseSongs
                                 if (songs.isEmpty()) {
                                     showQueueNotice(context.getString(R.string.no_tracks_here))
                                 } else {
-                                    viewModel.addSongsToPlaylist(playlist, songs) { added, duplicates ->
-                                        val message = when {
-                                            added == 0 && duplicates == songs.size ->
-                                                context.getString(R.string.all_songs_already_in_playlist)
-                                            added == 0 ->
-                                                context.getString(R.string.song_already_in_playlist)
-                                            duplicates == 0 -> context.resources.getQuantityString(
-                                                R.plurals.songs_added_to_playlist, added, added,
-                                            )
-                                            else -> context.resources.getQuantityString(
-                                                R.plurals.songs_added_to_playlist, added, added,
-                                            ) + " · " + context.resources.getQuantityString(
-                                                R.plurals.songs_already_in_playlist, duplicates, duplicates,
-                                            )
+                                    var completed = 0
+                                    var totalAdded = 0
+                                    var totalAlreadyThere = 0
+                                    songs.forEach { song ->
+                                        viewModel.addToPlaylists(selectedPlaylists, song) { added, alreadyThere, _ ->
+                                            totalAdded += added
+                                            totalAlreadyThere += alreadyThere
+                                            completed++
+                                            if (completed == songs.size) {
+                                                val message = when {
+                                                    totalAdded == 0 && totalAlreadyThere == songs.size * selectedPlaylists.size ->
+                                                        context.getString(R.string.all_songs_already_in_playlist)
+                                                    totalAdded == 0 ->
+                                                        context.getString(R.string.song_already_in_playlist)
+                                                    totalAlreadyThere == 0 -> context.resources.getQuantityString(
+                                                        R.plurals.songs_added_to_playlist, totalAdded, totalAdded,
+                                                    )
+                                                    else -> context.resources.getQuantityString(
+                                                        R.plurals.songs_added_to_playlist, totalAdded, totalAdded,
+                                                    ) + " · " + context.resources.getQuantityString(
+                                                        R.plurals.songs_already_in_playlist, totalAlreadyThere, totalAlreadyThere,
+                                                    )
+                                                }
+                                                showQueueNotice(message)
+                                            }
                                         }
-                                        showQueueNotice(message)
                                     }
                                 }
                             }
@@ -4700,131 +4696,7 @@ private fun BitChordApp(
                 onDismissRequest = { browseActions = null },
                 containerColor = MaterialTheme.colorScheme.background,
             ) {
-                BrowseActionsSheet(
-                    // The live answer, not the one the target was built with.
-                    target = target.copy(playlist = playlist),
-                    onPlayNext = act(playSongsNext),
-                    onAddToQueue = act(addSongsToQueue),
-                    // "Add to playlist" is offered for albums and playlists
-                    // signed-in users own the destinations for. Artist cards
-                    // have no track list of their own to pipe, so they get
-                    // no row. The tracks are resolved through the same helper
-                    // the queue rows use, so a card whose page was never
-                    // opened still works: it fetches on the way to the
-                    // picker.
-                    onAddToPlaylist = if (
-                        signedIn && (target.type == BrowseType.ALBUM || target.type == BrowseType.PLAYLIST)
-                    ) {
-                        act { songs ->
-                            playlistBrowseSongs = songs
-                            playlistBrowseTarget = target
-                            viewModel.loadPlaylists()
-                        }
-                    } else null,
-                    onPlay = act { songs -> play(songs, 0) }.takeIf { target.fromCard },
-                    onShuffle = act { songs ->
-                        // As on a release page: shuffle goes on before the queue
-                        // is built, so it is built shuffled rather than played
-                        // out of order.
-                        QueueShuffle.enableForNextQueue()
-                        play(songs, songs.indices.random())
-                    }.takeIf { target.fromCard },
-                    onOpen = target.browseId
-                        ?.takeIf { target.fromCard }
-                        ?.let { id ->
-                            {
-                                browseActions = null
-                                viewModel.openDetail(
-                                    browseId = id,
-                                    title = target.title,
-                                    subtitle = target.subtitle,
-                                    thumbnailUrl = target.thumbnailUrl,
-                                    type = target.type,
-                                )
-                            }
-                        },
-                    // The one place a whole release is asked for, from a card and
-                    // from the release's own page alike — its header spends that
-                    // spot on the search now. Nothing on this device needs
-                    // fetching to be on it, so a local page is the exception.
-                    // What the target carries that the tracks don't is the
-                    // release's own name and cover, which is exactly what the
-                    // record wants.
-                    onDownloadAll = act { songs ->
-                        startDownload(
-                            songs,
-                            target.browseId
-                                ?.takeIf { target.type != BrowseType.ARTIST }
-                                ?.let { id ->
-                                    DownloadTarget(
-                                        id = id,
-                                        title = target.title,
-                                        subtitle = target.subtitle,
-                                        thumbnailUrl = target.thumbnailUrl,
-                                        playlist = target.type == BrowseType.PLAYLIST,
-                                    )
-                                },
-                        )
-                    }.takeIf { remote },
-                    // The same link a share off YouTube Music's own overflow
-                    // gives — built from the browse id rather than fetched,
-                    // since nothing about it depends on the tracks or the
-                    // account. Left off an artist card (Share there is a
-                    // channel link, not a release, and nobody asked for it)
-                    // and off anything with no real browse id behind it.
-                    onShare = target.browseId
-                        ?.takeIf { remote && (target.type == BrowseType.ALBUM || target.type == BrowseType.PLAYLIST) }
-                        ?.let { id ->
-                            {
-                                val url = if (target.type == BrowseType.PLAYLIST) {
-                                    "https://music.youtube.com/playlist?list=${id.removePrefix("VL")}"
-                                } else {
-                                    "https://music.youtube.com/browse/$id"
-                                }
-                                val sendIntent = Intent(Intent.ACTION_SEND).apply {
-                                    type = "text/plain"
-                                    putExtra(Intent.EXTRA_TEXT, url)
-                                }
-                                context.startActivity(Intent.createChooser(sendIntent, target.title))
-                                browseActions = null
-                            }
-                        },
-                    isPinned = pinnableId != null && pinnableId in pinnedPlaylists,
-                    onTogglePin = pinnableId?.let { id ->
-                        {
-                            val nowPinned = AppSettings.togglePinnedPlaylist(id)
-                            if (!nowPinned && id !in pinnedPlaylists) {
-                                Toast.makeText(
-                                    context,
-                                    context.getString(
-                                        R.string.pinned_playlist_limit,
-                                        AppSettings.MAX_PINNED_PLAYLISTS,
-                                    ),
-                                    Toast.LENGTH_SHORT,
-                                ).show()
-                            }
-                            browseActions = null
-                        }
-                    },
-                    onRename = playlist?.let { p ->
-                        { name: String ->
-                            browseActions = null
-                            viewModel.renamePlaylist(p, name)
-                        }
-                    },
-                    onDelete = playlist?.let { p ->
-                        {
-                            browseActions = null
-                            viewModel.deletePlaylist(p)
-                        }
-                    },
-                    onDeleteDownload = target.downloadId?.let { id ->
-                        {
-                            browseActions = null
-                            scope.launch { Downloads.deleteCollection(context, id) }
-                        }
-                    },
-                )
+                browseMenuBody(target, SongActionsPresentation.Sheet)
             }
         }
 

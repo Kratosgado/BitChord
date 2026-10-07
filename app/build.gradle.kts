@@ -409,6 +409,10 @@ dependencies {
     implementation("androidx.room:room-runtime:$roomVersion")
     implementation("androidx.room:room-ktx:$roomVersion")
     kapt("androidx.room:room-compiler:$roomVersion")
+    // Room 2.7.1 bundles kotlin-metadata-jvm that only reads metadata up to 2.2.0.
+    // Kotlin 2.3.20 emits metadata 2.3.0, which makes the Room annotation processor
+    // reject every class at kapt time. Force the newer library that accepts 2.3.x.
+    kapt("org.jetbrains.kotlin:kotlin-metadata-jvm:2.3.20")
 
     // ---- Background work: offline queue drain on network recovery ----
     implementation("androidx.work:work-runtime-ktx:2.10.1")

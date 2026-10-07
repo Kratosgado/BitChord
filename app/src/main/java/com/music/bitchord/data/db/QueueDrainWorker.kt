@@ -45,13 +45,14 @@ class QueueDrainWorker(
 
             val ok = when (action.actionType) {
                 PendingActionType.ADD_TO_PLAYLIST -> {
-                    val playlistId = action.playlistId ?: run {
+                    if (action.playlistId == null) {
                         dao.delete(action.id)
-                        return@when true
+                        true
+                    } else {
+                        YtMusicRepository.addToPlaylist(action.playlistId, listOf(action.videoId))
+                            .onSuccess { dao.delete(action.id) }
+                            .isSuccess
                     }
-                    YtMusicRepository.addToPlaylist(playlistId, listOf(action.videoId))
-                        .onSuccess { dao.delete(action.id) }
-                        .isSuccess
                 }
                 PendingActionType.LIKE -> {
                     YtMusicRepository.rate(action.videoId, LikeStatus.LIKE)

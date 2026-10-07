@@ -9,7 +9,6 @@ import android.os.Looper
 import android.provider.Settings
 import android.widget.Toast
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -154,26 +153,6 @@ class AndroidPlayerHost(context: Context) : PlayerHost {
         main.post { Toast.makeText(app, message, Toast.LENGTH_SHORT).show() }
     }
 
-    private val _lyricsShareRequest = MutableStateFlow<LyricsShareCard?>(null)
-
-    /**
-     * The pending lyrics-share card, or null when no sheet is up. The Android
-     * NowPlaying host collects this and renders [LyricsShareSheet]; dismissing
-     * the sheet calls [dismissLyricsShare] to clear it.
-     */
-    internal val lyricsShareRequest: StateFlow<LyricsShareCard?> = _lyricsShareRequest.asStateFlow()
-
-    override fun shareLyrics(song: Song, lines: List<LyricsShareLinePayload>) {
-        _lyricsShareRequest.value = LyricsShareCard(
-            song = song,
-            artworkUrl = song.thumbnailUrl,
-            lines = lines.map { LyricsShareLine(it.text, it.subText, it.isGap) },
-        )
-    }
-
-    fun dismissLyricsShare() {
-        _lyricsShareRequest.value = null
-    }
     override val castState: StateFlow<CastUi> by lazy {
         CastController.ensureStarted(app)
         CastController.state

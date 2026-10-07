@@ -42,6 +42,7 @@ import com.music.bitchord.ui.replay.ShareAction
 import com.music.bitchord.ui.replay.cacheForSharing
 import com.music.bitchord.ui.replay.saveToGallery
 import com.music.bitchord.ui.replay.sendIntent
+import com.music.bitchord.ui.player.LyricsShareRequest
 import dev.chrisbanes.haze.HazeState
 import kotlinx.coroutines.launch
 
@@ -61,7 +62,7 @@ import kotlinx.coroutines.launch
 @Composable
 internal fun LyricsShareSheet(
     hazeState: HazeState,
-    request: LyricsShareCard,
+    request: LyricsShareRequest,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
