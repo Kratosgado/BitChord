@@ -82,6 +82,8 @@ fun SearchScreen(
     query: String,
     onQueryChange: (String) -> Unit,
     filter: SearchFilter,
+    currentSong: com.music.bitchord.data.model.Song? = null,
+    isPlaying: Boolean = false,
     onFilterChange: (SearchFilter) -> Unit,
     results: UiState<List<SearchResult>>?,
     loadingMore: Boolean,
@@ -124,6 +126,19 @@ fun SearchScreen(
      * the one search box the window needs, so the page there is results only.
      */
     showField: Boolean = true,
+    /** Whether the page is showing local library search results; see [libraryResults]. */
+    searchingLibrary: Boolean = false,
+    libraryResults: UiState<List<Song>>? = null,
+    /** Whether the page is showing the enabled addons' combined results; see [addonResults]. */
+    searchingAddons: Boolean = false,
+    addonResults: UiState<List<Song>>? = null,
+    addonHistory: List<String> = emptyList(),
+    onAddonHistoryClick: (String) -> Unit = {},
+    onAddonHistoryRemove: (String) -> Unit = {},
+    onAddonHistoryClear: () -> Unit = {},
+    onLibrarySongClick: (List<Song>, Int) -> Unit = onSongClick,
+    /** A segmented control for switching between YouTube, Library, and Addons search. */
+    sourceSwitcher: (@Composable () -> Unit)? = null,
 ) {
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current

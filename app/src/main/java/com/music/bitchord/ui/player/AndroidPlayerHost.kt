@@ -184,17 +184,17 @@ class AndroidPlayerHost(context: Context) : PlayerHost {
     override fun CastDialog(hazeState: HazeState, onDismiss: () -> Unit) =
         com.music.bitchord.ui.components.CastDialog(hazeState = hazeState, onDismiss = onDismiss)
 
-    private val _lyricsShareRequest = MutableStateFlow<LyricsShareCard?>(null)
+    private val _lyricsShareRequest = MutableStateFlow<LyricsShareRequest?>(null)
 
     /**
      * The pending lyrics-share card, or null when no sheet is up. The Android
      * NowPlaying host collects this and renders [LyricsShareSheet]; dismissing
      * the sheet calls [dismissLyricsShare] to clear it.
      */
-    internal val lyricsShareRequest: StateFlow<LyricsShareCard?> = _lyricsShareRequest.asStateFlow()
+    internal val lyricsShareRequest: StateFlow<LyricsShareRequest?> = _lyricsShareRequest.asStateFlow()
 
     override fun shareLyrics(song: Song, lines: List<LyricsShareLinePayload>) {
-        _lyricsShareRequest.value = LyricsShareCard(
+        _lyricsShareRequest.value = LyricsShareRequest(
             song = song,
             artworkUrl = song.thumbnailUrl,
             lines = lines.map { LyricsShareLine(it.text, it.subText, it.isGap) },

@@ -305,7 +305,7 @@ object SpotifyCanvas {
             is SpotifyCanvasQuery.Answer.NoCanvas -> {
                 // Pathfinder's answer isn't the last word: a video canvas can come back there
                 // in a shape this can't play while canvaz-cache still hands out the plain .cnvs.mp4.
-                Log.d(TAG, "pathfinder: no playable canvas for $trackUri (${answer.detail}); trying canvaz-cache")
+                Log.d(TAG, "pathfinder: no playable canvas for $trackUri; trying canvaz-cache")
                 fetchCanvasViaCanvaz(trackUri, token)
             }
             is SpotifyCanvasQuery.Answer.Failed -> {

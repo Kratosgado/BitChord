@@ -375,6 +375,12 @@ dependencies {
     implementation("com.halilibo.compose-richtext:richtext-ui-material3:0.20.0")
     implementation("com.halilibo.compose-richtext:richtext-commonmark:0.20.0")
 
+    // ---- Room + WorkManager (tv includes app/src/main/java which uses both) ----
+    val roomVersion = "2.7.1"
+    implementation("androidx.room:room-runtime:$roomVersion")
+    implementation("androidx.room:room-ktx:$roomVersion")
+    implementation("androidx.work:work-runtime-ktx:2.10.1")
+
     // ---- Innertube (YouTube Music) client: Ktor + kotlinx.serialization ----
     // Ktor and serialization are held at InnerTubeX's versions (below) so the
     // upgrade it forces is explicit rather than resolved behind our backs.

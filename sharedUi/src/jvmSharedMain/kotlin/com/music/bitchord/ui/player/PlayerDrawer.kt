@@ -102,6 +102,7 @@ fun PlayerDrawer(
     title: String,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
+    titleGap: androidx.compose.ui.unit.Dp = 14.dp,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val reduceDynamicBlur by PlayerSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
@@ -240,7 +241,7 @@ fun PlayerDrawer(
                 color = Color.White,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 4.dp, bottom = 14.dp),
+                    .padding(start = 4.dp, bottom = titleGap),
             )
             content()
         }

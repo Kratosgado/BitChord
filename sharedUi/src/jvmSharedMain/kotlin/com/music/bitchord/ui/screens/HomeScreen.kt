@@ -118,6 +118,8 @@ fun HomeScreen(
      * there every shelf is the ordinary row.
      */
     leadHero: Boolean = true,
+    currentSong: com.music.bitchord.data.model.Song? = null,
+    isPlaying: Boolean = false,
 ) {
     val recentsViewType by AppUi.host.homeRecentsViewType.collectAsStateWithLifecycle()
 

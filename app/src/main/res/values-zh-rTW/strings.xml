@@ -1324,4 +1324,39 @@
     <string name="wear_os_code_hint">配對碼</string>
     <string name="wear_os_done">完成</string>
     <string name="spotify_use_spdc_token">使用 sp_dc 權杖</string>
+    <string name="artist_signatures">Artist signatures</string>
+        
+    <string name="artist_signatures_subtitle">Shows a handwritten signature when Apple Music has no title logo</string>
+        
+    <string name="artist_signatures_url">Signature API URL</string>
+        
+    <string name="artist_signatures_url_hint">https://signatures.example.com</string>
+        
+    <string name="artist_signatures_unconfigured">Not configured — tap to set the API URL</string>
+        
+    <string name="artist_signatures_test_failed">Could not reach the API at that URL</string>
+        
+    <string name="lyrics_share_pick_limit">Card is full</string>
+        
+    <string name="lyrics_pick_count">%1$d lines · %2$d/%3$d</string>
+        
+    <plurals name="lyrics_lines_picked">
+            <item quantity="one">%1$d line picked</item>
+            <item quantity="other">%1$d lines picked</item>
+        </plurals>
+        
+    <plurals name="songs_added_to_playlist">
+            <item quantity="one">Added %1$d song to the playlist</item>
+            <item quantity="other">Added %1$d songs to the playlist</item>
+        </plurals>
+        
+    <plurals name="songs_already_in_playlist">
+            <item quantity="one">%1$d song already in the playlist</item>
+            <item quantity="other">%1$d songs already in the playlist</item>
+        </plurals>
+        
+    <string name="all_songs_already_in_playlist">All tracks are already in the playlist</string>
+        
+    <string name="signed_by">Signed by %1$s</string>
+        
 </resources>

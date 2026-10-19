@@ -10,6 +10,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.keyframes
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.ui.layout.layout
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.DownloadDone
 import androidx.compose.material.icons.rounded.CheckCircle
@@ -92,6 +98,10 @@ import androidx.compose.foundation.border
  * bars and the pages, is what keeps that true.
  */
 val PAGE_GUTTER = 10.dp
+
+val BAR_GUTTER = PAGE_GUTTER
+val TRACK_NUMBER_WIDTH = 24.dp
+val NUMBERED_ROW_DIVIDER_INSET = PAGE_GUTTER + TRACK_NUMBER_WIDTH + PAGE_GUTTER
 
 /** Where a divider under a track row starts: clear of the 52dp of artwork. */
 val ROW_DIVIDER_INSET = PAGE_GUTTER + 68.dp
@@ -289,6 +299,8 @@ fun SongRow(
     isCurrent: Boolean = false,
     /** Distinguishes active playback from the same current item while paused. */
     isPlaying: Boolean = false,
+    /** Search results use artwork bars instead of the usual current-song icon. */
+    searchPlayingStyle: Boolean = false,
     /** Accent supplied by artwork-tinted pages. */
     activeTint: Color = MaterialTheme.colorScheme.primary,
     /** True while a Downloads row belongs to the current multi-selection. */
@@ -328,6 +340,7 @@ fun SongRow(
             downloadedTint = downloadedTint,
             isCurrent = isCurrent,
             isPlaying = isPlaying,
+            searchPlayingStyle = searchPlayingStyle,
             activeTint = activeTint,
             selected = selected,
         )
@@ -374,6 +387,7 @@ fun SongRow(
             downloadedTint = downloadedTint,
             isCurrent = isCurrent,
             isPlaying = isPlaying,
+            searchPlayingStyle = searchPlayingStyle,
             activeTint = activeTint,
             selected = selected,
         )
@@ -440,6 +454,7 @@ private fun SongRowContent(
     downloadedTint: Color? = MaterialTheme.colorScheme.primary,
     isCurrent: Boolean = false,
     isPlaying: Boolean = false,
+    searchPlayingStyle: Boolean = false,
     activeTint: Color = MaterialTheme.colorScheme.primary,
     selected: Boolean = false,
 ) {
@@ -738,5 +753,94 @@ fun PillTextField(
             keyboardActions = keyboardActions,
             modifier = Modifier.fillMaxWidth(),
         )
+    }
+}
+
+/** How far a row's [RowMoreButton] reaches past the content edge into the gutter. */
+val ROW_MORE_OUTSET = 14.dp
+
+/**
+ * Lays a trailing control out [outset] narrower than it draws, so it overhangs
+ * its row's end edge by that much: for buttons whose glyph is far smaller than
+ * their touch target, which would otherwise sit visibly inset from the edge.
+ */
+fun Modifier.hangIntoGutter(outset: Dp): Modifier = layout { measurable, constraints ->
+    val placeable = measurable.measure(constraints)
+    val width = (placeable.width - outset.roundToPx()).coerceAtLeast(0)
+    layout(width, placeable.height) { placeable.place(0, 0) }
+}
+
+/**
+ * The ⋮ at the end of a row.
+ */
+@Composable
+fun RowMoreButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    tint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    iconSize: Dp = 20.dp,
+) {
+    Box(
+        modifier = modifier
+            .hangIntoGutter(ROW_MORE_OUTSET)
+            .size(36.dp)
+            .clip(CircleShape)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            Icons.Rounded.MoreVert,
+            contentDescription = stringResource(Res.string.more),
+            tint = tint,
+            modifier = Modifier.size(iconSize),
+        )
+    }
+}
+
+/** The accent a current song's title takes in lists that mark it with [SearchPlayingBars]. */
+val PlayingAccent = Color(0xFFFB4A62)
+
+@Composable
+fun SearchPlayingBars(modifier: Modifier = Modifier) {
+    val heights = listOf(0.38f, 0.78f, 0.52f).mapIndexed { index, minimum ->
+        val transition = rememberInfiniteTransition(label = "search playing bar $index")
+        val height by transition.animateFloat(
+            initialValue = minimum,
+            targetValue = 1f - (index * 0.12f),
+            animationSpec = infiniteRepeatable(
+                animation = keyframes {
+                    durationMillis = 520 + index * 130
+                    minimum at 0
+                    1f at (260 + index * 50)
+                    minimum at durationMillis
+                },
+                repeatMode = RepeatMode.Reverse,
+            ),
+            label = "search bar height $index",
+        )
+        height
+    }
+    Box(
+        modifier = modifier
+            .size(24.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .background(Color.Black.copy(alpha = 0.52f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Row(
+            modifier = Modifier.height(14.dp),
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+            verticalAlignment = Alignment.Bottom,
+        ) {
+            heights.forEach { height ->
+                Box(
+                    Modifier
+                        .width(3.dp)
+                        .height(14.dp * height)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(Color.White),
+                )
+            }
+        }
     }
 }

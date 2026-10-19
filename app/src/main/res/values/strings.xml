@@ -1211,4 +1211,12 @@
     <string name="wear_os_code_hint">Pairing code</string>
     <string name="wear_os_done">Done</string>
     <string name="signed_by">Signed by %1$s</string>
+    <plurals name="add_to_playlists_count">
+        <item quantity="one">Add to %1$d playlist</item>
+        <item quantity="other">Add to %1$d playlists</item>
+    </plurals>
+    <plurals name="added_to_playlists_notice">
+        <item quantity="one">Added to %1$d playlist</item>
+        <item quantity="other">Added to %1$d playlists</item>
+    </plurals>
 </resources>

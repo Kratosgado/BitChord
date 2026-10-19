@@ -37,7 +37,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
+import org.jetbrains.compose.resources.DrawableResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.music.bitchord.data.YtMusicRepository
@@ -82,6 +84,7 @@ fun LibraryScreen(
     onShelfItemClick: (ShelfItem) -> Unit,
     onShelfItemLongPress: (ShelfItem) -> Unit,
     onNewPlaylist: () -> Unit,
+    onImportSpotifyPlaylist: (() -> Unit)? = null,
     /**
      * A shelf's "Show all" — every shelf's row here stops at five cards (see
      * [LibraryGridShelf]), so this is the only way to reach whatever didn't
@@ -106,6 +109,7 @@ fun LibraryScreen(
      * this build supports, and the playlists downloaded whole. Built by the
      * app, since which of those exist is the platform's business.
      */
+    links: List<LibraryLink> = emptyList(),
     deviceItems: List<ShelfItem>,
     /** The big "Library" heading; the desktop's pages carry none. */
     showTitle: Boolean = true,
@@ -477,3 +481,7 @@ private fun HomeShelf.sortedForLibrary(sort: LibrarySort): HomeShelf = when (sor
 
 /** The library feed whose cards are the account's own — see [PlaylistShelf]. */
 private const val PLAYLISTS = YtMusicRepository.PLAYLISTS_SHELF
+
+/** One of the Library's folder rows: the page [item] opens, behind [icon]. */
+/** [logo], when set, is drawn in place of [icon] — a service's own mark. */
+data class LibraryLink(val item: ShelfItem, val icon: ImageVector, val logo: DrawableResource? = null)

@@ -50,7 +50,8 @@ import kotlinx.coroutines.withContext
  */
 internal suspend fun renderLyricsShareCard(
     context: Context,
-    card: LyricsShareCard,
+    card: LyricsShareRequest,
+    story: Boolean = false,
 ): Bitmap = withContext(Dispatchers.Default) {
     val type = Fonts(context)
     val cover = card.artworkUrl?.let { loadBitmap(context, it) }

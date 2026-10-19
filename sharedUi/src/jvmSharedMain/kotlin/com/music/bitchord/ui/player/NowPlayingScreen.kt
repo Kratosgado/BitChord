@@ -570,7 +570,7 @@ fun NowPlayingScreen(
     onClearQueue: () -> Unit,
     onOpenMenu: () -> Unit,
     onOpenAlbum: (String) -> Unit,
-    onOpenArtist: (String) -> Unit,
+    onOpenArtist: (browseId: String?, name: String) -> Unit,
     /** Return to the queue-level page named by the caption above the player. */
     onOpenPlaybackSource: () -> Unit,
     /**
@@ -1562,7 +1562,7 @@ fun NowPlayingScreen(
                                 onToggleLike = onToggleLike,
                                 onOpenMenu = onOpenMenu,
                                 onOpenAlbum = onOpenAlbum,
-                                onOpenArtist = { browseId, _ -> if (browseId != null) onOpenArtist(browseId) },
+                                onOpenArtist = { browseId, name -> onOpenArtist(browseId, name) },
                             )
                         },
                         lyricStrip = if (syncedLyricsEnabled) {
@@ -2728,7 +2728,7 @@ fun NowPlayingScreen(
                                     // starting together reads as clutter, so the artist
                                     // waits a beat before it joins in.
                                     startDelayMillis = if (titleOverflowing) MARQUEE_ARTIST_STAGGER_MS else 0L,
-                                    modifier = Modifier.opensPage(song.artistId, onOpenArtist),
+                                    modifier = Modifier.opensPage(song.artistId) { id -> onOpenArtist(id, song.artist) },
                                 )
                             }
                         }

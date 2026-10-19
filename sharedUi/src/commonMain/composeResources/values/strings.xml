@@ -154,6 +154,8 @@
     <string name="search">Search</string>
     <string name="search_empty">Search millions of songs on YouTube Music.</string>
     <string name="search_hint">Artists, Songs, Lyrics and More</string>
+    <string name="search_addons_hint">Search your addons</string>
+    <string name="search_library_hint">Songs, Artists and Albums</string>
     <string name="selected">Selected</string>
     <string name="share">Share</string>
     <string name="shelf_artists_on_the_rise">Artists on the rise</string>

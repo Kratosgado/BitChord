@@ -2,7 +2,9 @@ package com.music.bitchord.playback
 
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 
 /**
@@ -23,6 +25,37 @@ import androidx.compose.runtime.setValue
  */
 @Stable
 class PlaybackPosition {
-    /** Written only by whoever owns playback — the phone's controller, the desktop's engine. */
+    /** The latest reading of the playhead. Written through [report], with the time it was taken. */
     var positionMs by mutableLongStateOf(0L)
+        private set
+
+    /**
+     * When [positionMs] was read off the player, on the [System.nanoTime] clock.
+     *
+     * The lyrics run a clock of their own between readings, and the only thing
+     * that lets them use a reading is knowing *when* it was true.
+     */
+    var sampledAtNanos by mutableLongStateOf(0L)
+        private set
+
+    /**
+     * Bumped by the owner every time the playhead jumps on purpose — a seek, a
+     * skip, a repeat starting over — so the lyrics can tell a real jump from a
+     * reading that is merely late or early.
+     */
+    var seeks by mutableIntStateOf(0)
+
+    /**
+     * False while playback is meant to be running but the playhead is not moving yet.
+     * The phone never sets it — Media3 already reports a buffering player as not playing.
+     */
+    var advancing by mutableStateOf(true)
+
+    /**
+     * Records a reading of the playhead and when it was taken.
+     */
+    fun report(positionMs: Long, sampledAtNanos: Long = System.nanoTime()) {
+        this.positionMs = positionMs
+        this.sampledAtNanos = sampledAtNanos
+    }
 }
