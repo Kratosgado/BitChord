@@ -23,7 +23,7 @@ fun SyncedLyricsPanel(
     LyricsPanel(
         lines = lines,
         trackKey = trackKey,
-        playhead = rememberLyricPlayhead(position),
+        positionMs = position.positionMs,
         looking = looking,
         isPlaying = isPlaying,
         onSeekToLine = onSeekToLine,

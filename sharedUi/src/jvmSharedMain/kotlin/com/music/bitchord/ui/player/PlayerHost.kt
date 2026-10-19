@@ -88,6 +88,9 @@ interface PlayerHost {
     /** Show the lyrics-share sheet for [song] with the reader's picked [lines]. Android renders a card; other platforms may no-op. */
     fun shareLyrics(song: Song, lines: List<LyricsShareLinePayload>)
 
+    /** Whether the lyrics share feature is available on this platform. */
+    val lyricsShareAvailable: Boolean get() = false
+
     /** The full signal-chain readout, opened from the output drawer. */
     @Composable
     fun AudioPipelineDialog(hazeState: HazeState, isPlaying: Boolean, onDismiss: () -> Unit)
@@ -132,6 +135,7 @@ interface PlayerSettingsSource {
     val smartMixInProgress: StateFlow<Boolean>
     val smartTransitionWindow: StateFlow<TransitionWindow?>
     val spotifyCanvasAutoHide: StateFlow<Boolean>
+    val showQueueHistory: StateFlow<Boolean>
     val syncedLyrics: StateFlow<Boolean>
     val translationLanguage: StateFlow<String>
     val versionAlignmentInProgress: StateFlow<Boolean>

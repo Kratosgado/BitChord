@@ -374,7 +374,7 @@ private fun RecentTrackRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         AsyncImage(
-            model = thumbnailUrl.artworkAt(ROW_ART_PX),
+            model = item.thumbnailUrl.artworkAt(ROW_ART_PX),
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier
@@ -386,14 +386,14 @@ private fun RecentTrackRow(
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(
-                text = title,
+                text = item.title,
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onBackground,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                text = subtitle,
+                text = item.subtitle,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,

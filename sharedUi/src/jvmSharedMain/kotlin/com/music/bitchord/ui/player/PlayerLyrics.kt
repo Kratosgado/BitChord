@@ -19,6 +19,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -1379,6 +1380,15 @@ internal fun rememberPlayerControlsOnScroll(
             }
         }
     }
+}
+
+/**
+ * Scope that reads [position] and provides the resulting millisecond value to
+ * [content], limiting recomposition from position ticks to this scope alone.
+ */
+@Composable
+internal fun PlaybackPositionScope(position: () -> Long, content: @Composable (Long) -> Unit) {
+    content(position())
 }
 
 /**

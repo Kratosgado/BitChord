@@ -1562,7 +1562,7 @@ fun NowPlayingScreen(
                                 onToggleLike = onToggleLike,
                                 onOpenMenu = onOpenMenu,
                                 onOpenAlbum = onOpenAlbum,
-                                onOpenArtist = onOpenArtist,
+                                onOpenArtist = { browseId, _ -> if (browseId != null) onOpenArtist(browseId) },
                             )
                         },
                         lyricStrip = if (syncedLyricsEnabled) {
@@ -1637,9 +1637,9 @@ fun NowPlayingScreen(
                             lyricsLoadingText
                         },
                         status = lyricsTranslation.status,
-                        onChangeProvider = { showLyricsProviders = true },
+                        onStatusClick = { showLyricsProviders = true },
                         romanizationToggle = {
-                            if (!lyricPicker.picking) {
+                            if (!lyricPicking) {
                                 RomanizationToggleButton(
                                     state = lyricsTranslation.romanizationState,
                                     showingRomanization = lyricsTranslation.showingRomanization,
@@ -1649,7 +1649,7 @@ fun NowPlayingScreen(
                             }
                         },
                         translationToggle = {
-                            if (!lyricPicker.picking) {
+                            if (!lyricPicking) {
                                 TranslationToggleButton(
                                     state = lyricsTranslation.translationState,
                                     showingTranslation = lyricsTranslation.showingTranslation,
@@ -2828,7 +2828,7 @@ fun NowPlayingScreen(
                     // for reading, and a control parked over the words when
                     // nobody asked for the controls is one more thing between
                     // the reader and them.
-                    val translateShown = lyricsPanelVisible && lyricsControlsOpen && !lyricPicker.picking
+                    val translateShown = lyricsPanelVisible && lyricsControlsOpen && !lyricPicking
                     val translateFade by animateFloatAsState(
                         targetValue = if (translateShown) 1f else 0f,
                         animationSpec = tween(if (translateShown) 220 else 160),
@@ -3136,14 +3136,6 @@ private suspend fun AwaitPointerEventScope.dragQueueIn(
     onHold(false)
     onSettle(open)
 }
-
-/**
- * How much text one share card is allowed to hold, in characters — the picked
- * words only. Kept in step with the app module's SHARE_CARD_CHAR_BUDGET, which
- * is where the card is actually drawn: the pick is enforced here, in shared
- * code, so the value has to live on both sides of the seam.
- */
-private const val SHARE_CARD_CHAR_BUDGET = 250
 
 /** Whether a line of [text] still fits a card already holding [taken] characters. */
 private fun fitsOnShareCard(taken: Int, text: String?): Boolean =

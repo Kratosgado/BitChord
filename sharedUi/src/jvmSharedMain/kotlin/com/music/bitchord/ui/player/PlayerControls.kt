@@ -61,10 +61,14 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import com.music.bitchord.data.model.ArtistCredit
+import com.music.bitchord.data.model.CreditSegment
+import com.music.bitchord.data.model.creditSegments
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import androidx.compose.ui.Alignment
@@ -1562,4 +1566,105 @@ private fun TrackAnalysisState.localizedLabel(): String = when (this) {
     TrackAnalysisState.ANALYSING -> stringResource(Res.string.analysis_in_progress)
     TrackAnalysisState.WAITING -> stringResource(Res.string.waiting)
     TrackAnalysisState.FAILED -> stringResource(Res.string.failed)
+}
+
+/**
+ * The tint colour for secondary player elements (artist, timestamps, glyphs).
+ * Defaults to white; platforms that derive it from the artwork override it.
+ */
+internal val LocalPlayerTint = compositionLocalOf { Color.White }
+
+private val LinkPressShape = RoundedCornerShape(6.dp)
+
+/**
+ * The artist-credits line as a marquee with per-artist tap targets.
+ * Each credited name is tappable and calls [onOpenArtist] with its browse id.
+ */
+@Composable
+internal fun ArtistCreditsMarquee(
+    text: String,
+    credits: List<ArtistCredit>,
+    style: TextStyle,
+    color: Color,
+    onOpenArtist: (browseId: String?, name: String) -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    startDelayMillis: Long = 0L,
+) {
+    val density = LocalDensity.current
+    val textMeasurer = rememberTextMeasurer()
+    val segments = remember(text, credits) { creditSegments(text, credits) }
+
+    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
+        if (!enabled) {
+            CreditLine(segments = segments, style = style, color = color, onOpenArtist = onOpenArtist)
+            return@Row
+        }
+        BoxWithConstraints(Modifier.weight(1f, fill = false).clipToBounds()) {
+            val maxWidthPx = constraints.maxWidth
+            val layout = remember(text, style, maxWidthPx) {
+                textMeasurer.measure(text = text, style = style, maxLines = 1, softWrap = false)
+            }
+            val overflowing = layout.size.width > maxWidthPx
+            val travelPx = if (overflowing) {
+                layout.size.width + with(density) { MARQUEE_GAP.roundToPx() }
+            } else {
+                0
+            }
+
+            val offsetX = remember { Animatable(0f) }
+            LaunchedEffect(text, travelPx, startDelayMillis) {
+                offsetX.snapTo(0f)
+                if (travelPx <= 0) return@LaunchedEffect
+                val pxPerMs = with(density) { MARQUEE_DP_PER_SEC.dp.toPx() } / 1000f
+                val scrollMs = (travelPx / pxPerMs).roundToInt().coerceAtLeast(400)
+                delay(startDelayMillis)
+                while (true) {
+                    offsetX.animateTo(-travelPx.toFloat(), tween(scrollMs, easing = LinearEasing))
+                    offsetX.snapTo(0f)
+                    delay(MARQUEE_REST_MS)
+                }
+            }
+
+            Row(
+                modifier = Modifier
+                    .wrapContentWidth(align = Alignment.Start, unbounded = true)
+                    .offset { IntOffset(offsetX.value.roundToInt(), 0) },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                CreditLine(segments = segments, style = style, color = color, onOpenArtist = onOpenArtist)
+                if (overflowing) {
+                    Spacer(Modifier.width(MARQUEE_GAP))
+                    CreditLine(segments = segments, style = style, color = color, onOpenArtist = onOpenArtist)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CreditLine(
+    segments: List<CreditSegment>,
+    style: TextStyle,
+    color: Color,
+    onOpenArtist: (browseId: String?, name: String) -> Unit,
+) {
+    segments.forEach { segment ->
+        val credit = segment.credit
+        Text(
+            text = segment.text,
+            style = style,
+            color = color,
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Clip,
+            modifier = if (credit == null) {
+                Modifier
+            } else {
+                Modifier
+                    .clip(LinkPressShape)
+                    .clickable { onOpenArtist(credit.browseId, credit.name) }
+            },
+        )
+    }
 }

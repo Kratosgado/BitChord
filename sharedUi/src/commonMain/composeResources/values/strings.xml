@@ -102,6 +102,7 @@
     <string name="played_by">Played by %1$s</string>
     <string name="playing_from">Playing from %1$s</string>
     <string name="playing_radio">Playing %1$s Radio</string>
+    <string name="previously_played">Previously played</string>
     <string name="queue">Queue</string>
     <string name="remove_from_liked">Remove from Liked Music</string>
     <string name="remove_from_queue">Remove from queue</string>

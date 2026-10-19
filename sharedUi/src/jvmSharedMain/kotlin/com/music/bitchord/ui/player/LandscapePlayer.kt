@@ -60,10 +60,8 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import coil3.compose.AsyncImagePainter
 import coil3.request.ImageRequest
-import com.music.bitchord.ui.components.ExplicitBadge
 import com.music.bitchord.ui.haptics.Haptic
 import com.music.bitchord.ui.icons.BitChordIcons
-import com.music.bitchord.ui.theme.stableStatusBarInsets
 import com.music.bitchord.data.canvas.CanvasArtwork
 import com.music.bitchord.data.model.LikeStatus
 import com.music.bitchord.data.model.Song
@@ -158,7 +156,7 @@ internal fun LandscapePlayerLayout(
                 .fillMaxSize()
                 // The status bar counted whether or not it is showing, so the
                 // layout holds still when the player hides it.
-                .windowInsetsPadding(WindowInsets.safeDrawing.union(stableStatusBarInsets())),
+                .windowInsetsPadding(WindowInsets.safeDrawing),
             contentAlignment = Alignment.TopCenter,
         ) {
             val compact = maxHeight < LANDSCAPE_COMPACT_HEIGHT
@@ -255,7 +253,7 @@ internal fun LandscapePlayerLayout(
                     .height(5.dp)
                     .shadow(2.dp, RoundedCornerShape(3.dp), clip = false)
                     .clip(RoundedCornerShape(3.dp))
-                    .background(LocalPlayerTint.current.copy(alpha = 0.70f)),
+                    .background(Color.White.copy(alpha = 0.70f)),
             )
         }
     }
@@ -451,9 +449,7 @@ internal fun LandscapeCredits(
                         artistCredits(song.artist, song.artists, song.artistId)
                     },
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.W500),
-                    color = LocalPlayerTint.current.copy(alpha = 0.55f),
-                    // A title that's also scrolling gets to go first — starting
-                    // together reads as clutter, so the artist waits a beat.
+                    color = Color.White.copy(alpha = 0.55f),
                     startDelayMillis = if (titleOverflowing) MARQUEE_ARTIST_STAGGER_MS else 0L,
                     onOpenArtist = onOpenArtist,
                 )
@@ -555,7 +551,7 @@ internal fun LandscapeLyricsPane(
             ) {
                 LyricsStatusWithChange(
                     status = status,
-                    onStatusClick = onStatusClick,
+                    onChange = onStatusClick,
                 )
             }
             Box(Modifier.size(34.dp)) { if (hasLyrics) translationToggle() }
