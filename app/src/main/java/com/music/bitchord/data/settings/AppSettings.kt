@@ -139,13 +139,6 @@ enum class SongSort {
     DATE_ADDED_DESC,
 }
 
-/** Display mode for music lists: compact rows or grid cards. */
-enum class LibraryViewType {
-    LIST,
-    GRID,
-}
-
-
 /**
  * App settings, backed by SharedPreferences and exposed as flows.
  *

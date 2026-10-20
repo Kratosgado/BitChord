@@ -528,7 +528,7 @@
     <string name="top_artist">トップアーティスト</string>
     <string name="top_genre">トップジャンル</string>
     <string name="top_song">トップ曲</string>
-    <string name="when_you_listen_most">最もよく聴く時間帯</string>
+    <string name="when_you_listen_the_most">最もよく聴く時間帯</string>
     <string name="your_biggest_day">最も聴いた日：%1$s</string>
     <string name="your_listening_experience">あなたの再生体験</string>
     <string name="your_replay">あなたのReplay</string>
@@ -1316,7 +1316,6 @@
         
     <string name="replay_summary_end_week">week</string>
         
-    <string name="when_you_listen_the_most">When you listen the most</string>
         
     <string name="advanced_automix">Advanced Automix</string>
         

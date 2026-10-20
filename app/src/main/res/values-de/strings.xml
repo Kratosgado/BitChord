@@ -543,7 +543,7 @@
     <string name="top_artist">Top-Künstler</string>
     <string name="top_genre">Top-Genre</string>
     <string name="top_song">Top-Song</string>
-    <string name="when_you_listen_most">Wann du am meisten hörst</string>
+    <string name="when_you_listen_the_most">Wann du am meisten hörst</string>
     <string name="your_biggest_day">Dein größter Tag: %1$s</string>
     <string name="your_listening_experience">Dein Hörerlebnis</string>
     <string name="your_replay">Dein Replay</string>
@@ -1335,7 +1335,6 @@
         
     <string name="replay_summary_end_week">week</string>
         
-    <string name="when_you_listen_the_most">When you listen the most</string>
         
     <string name="advanced_automix">Advanced Automix</string>
         

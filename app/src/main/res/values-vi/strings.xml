@@ -565,7 +565,7 @@
     <string name="top_artist">Nghệ sĩ hàng đầu</string>
     <string name="top_genre">Thể loại hàng đầu</string>
     <string name="top_song">Bài hát hàng đầu</string>
-    <string name="when_you_listen_most">Thời điểm bạn nghe nhiều nhất</string>
+    <string name="when_you_listen_the_most">Thời điểm bạn nghe nhiều nhất</string>
     <string name="your_biggest_day">Ngày nghe nhiều nhất: %1$s</string>
     <string name="your_listening_experience">Trải nghiệm nghe nhạc của bạn</string>
     <string name="your_replay">BitChord Replay của bạn</string>
@@ -1258,7 +1258,6 @@
         
     <string name="replay_summary_end_week">week</string>
         
-    <string name="when_you_listen_the_most">When you listen the most</string>
         
     <string name="advanced_automix">Advanced Automix</string>
         
