@@ -83,6 +83,22 @@ object PlaybackTracker {
         var atrSent = false
     }
 
+    /**
+     * The record a session leaves behind when the radio was off.
+     *
+     * No tracking URLs, no `atr` schedule, no HTTP calls while the track is
+     * playing — those answers are fetched when the queue is drained. All we
+     * know up front is the videoId, the nonce we picked for this play, when it
+     * started, and how many seconds have gone by.
+     */
+    private class OfflineSession(
+        val videoId: String,
+        val cpn: String,
+        val startedAtMs: Long,
+    ) {
+        var watchtimeSeconds = 0L
+    }
+
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     private val _registeredPlays = MutableStateFlow(0)
@@ -101,9 +117,20 @@ object PlaybackTracker {
     @Volatile
     private var session: Session? = null
 
+    /**
+     * The current play's offline draft, if any. Mutually exclusive with
+     * [session]: once a track is being tracked for real against YouTube we
+     * stop holding an offline copy of it.
+     */
+    @Volatile
+    private var offline: OfflineSession? = null
+
     /** The track a session is being opened for, so repeat calls don't stack up. */
     @Volatile
     private var opening: String? = null
+
+    /** Guard around queue drain so a connectivity flap can't start it twice. */
+    private val drainLock = Mutex()
 
     /**
      * Call when [videoId] becomes audible — both on play/resume and when the
@@ -117,12 +144,20 @@ object PlaybackTracker {
         // whole point of downloading it — so this is the one place that has
         // to ask before trying rather than let a request find out the hard
         // way. [meteredConnection] is null exactly when there is no active
-        // network, which is the one case worth skipping outright rather than
-        // spending three retries on: nothing here is urgent enough to wait
-        // for connectivity to return, and the play was still counted by
-        // whichever surface reads local listening history.
-        if (AppSettings.meteredConnection.value == null) return
+        // network: with no way to open a session right now, the play is held
+        // as a draft on disk and flushed once connectivity returns. That is
+        // the behavior YouTube Music's own client has — downloaded tracks
+        // played offline count against history retroactively.
+        if (AppSettings.meteredConnection.value == null) {
+            openOffline(videoId)
+            return
+        }
         if (session?.videoId == videoId || opening == videoId) return
+        // Any stale offline draft is about to be replaced by a live session,
+        // so stop accumulating against it. The track changed and this call is
+        // what tells the tracker that; the previous draft is persisted by
+        // whichever path routed us here (onTrackChanged / onPlaybackFinished).
+        offline = null
         opening = videoId
         scope.launch(TrackLog.about(videoId)) {
             try {
@@ -134,11 +169,56 @@ object PlaybackTracker {
     }
 
     /**
+     * Open a local draft for a track that started while offline.
+     *
+     * A pause/resume on the same track must not record a second play, so this
+     * is a no-op when the draft is already open for that videoId. The nonce
+     * is picked now and travels with the entry through persistence, so a
+     * flush that spans a process restart still carries one CPN per play.
+     */
+    private fun openOffline(videoId: String) {
+        val existing = offline
+        if (existing != null && existing.videoId == videoId) return
+        // The queue moved on without a chance to persist the previous draft —
+        // flush it now so its watchtime is not lost to the next track's start.
+        if (existing != null) persistOffline(existing)
+        offline = OfflineSession(
+            videoId = videoId,
+            cpn = Innertube.newCpn(),
+            startedAtMs = System.currentTimeMillis(),
+        )
+    }
+
+    private fun persistOffline(draft: OfflineSession) {
+        // A draft that never passed the ATR threshold is a track that was
+        // skipped the moment it started: not worth sending as a history entry
+        // even once the radio comes back.
+        if (draft.watchtimeSeconds < DEFAULT_ATR_SECONDS) return
+        OfflinePlayQueue.enqueue(
+            OfflinePlayQueue.Entry(
+                videoId = draft.videoId,
+                cpn = draft.cpn,
+                startedAtMs = draft.startedAtMs,
+                watchtimeSeconds = draft.watchtimeSeconds,
+            ),
+        )
+    }
+
+    /** Mirrors YouTube's own default ATR schedule — the "did they really listen" bar. */
+    private const val DEFAULT_ATR_SECONDS = 5L
+
+    /**
      * Call when the queue moves to a different track. The previous session's
      * watched time is flushed before it is dropped, so a track skipped at the
      * two-minute mark is reported as two minutes rather than lost.
      */
     fun onTrackChanged(positionSeconds: Long) {
+        val closingOffline = offline
+        if (closingOffline != null) {
+            closingOffline.watchtimeSeconds = maxOf(closingOffline.watchtimeSeconds, positionSeconds)
+            offline = null
+            persistOffline(closingOffline)
+        }
         val closing = session ?: return
         session = null
         scope.launch(TrackLog.about(closing.videoId)) {
@@ -155,6 +235,10 @@ object PlaybackTracker {
      * [REPORT_INTERVAL_SECONDS] of new audio.
      */
     fun onProgress(videoId: String, positionSeconds: Long) {
+        val draft = offline
+        if (draft != null && draft.videoId == videoId) {
+            draft.watchtimeSeconds = maxOf(draft.watchtimeSeconds, positionSeconds)
+        }
         val current = session ?: return
         if (current.videoId != videoId) return
         if (!current.atrSent && positionSeconds >= current.tracking.atrAfterSeconds) {
@@ -188,6 +272,12 @@ object PlaybackTracker {
      * is a teardown that is about to cancel everything in sight.
      */
     fun onPlaybackFinished(positionSeconds: Long) {
+        val closingOffline = offline
+        if (closingOffline != null) {
+            closingOffline.watchtimeSeconds = maxOf(closingOffline.watchtimeSeconds, positionSeconds)
+            offline = null
+            persistOffline(closingOffline)
+        }
         val closing = session ?: return
         session = null
         scope.launch(TrackLog.about(closing.videoId)) {
@@ -273,5 +363,90 @@ object PlaybackTracker {
                     "${if (final) " (final)" else ""} (HTTP $status)",
             )
         }
+    }
+
+    /**
+     * Opens the queue of offline plays and keeps it draining whenever the
+     * device is online. One call at process start, from [BitChordApplication].
+     *
+     * The observer fires once per distinct connectivity state, so a Wi-Fi to
+     * cellular handover does not restart a drain that is already underway;
+     * the first value — null or not — triggers a startup drain attempt,
+     * which covers the queue a previous launch left behind.
+     */
+    fun start(context: android.content.Context) {
+        OfflinePlayQueue.init(context)
+        // StateFlow already de-dupes consecutive equal values, so Wi-Fi to
+        // cellular — same `true`, same `false` — won't restart a drain.
+        scope.launch {
+            AppSettings.meteredConnection.collect { metered ->
+                if (metered != null) drainOfflineQueue()
+            }
+        }
+    }
+
+    /**
+     * Replay every queued play against YouTube's history endpoints.
+     *
+     * One entry at a time, by design: the three-ping sequence (playback → atr
+     * → watchtime(final=1)) is cheap individually but hitting the servers in
+     * parallel reads as noise, and this is a background catch-up — the user
+     * is not waiting on it. Entries that succeed are removed; entries that
+     * fail stay in the queue for the next drain. The `atr` ping is dropped on
+     * entries that never crossed the ATR threshold, which already fell out of
+     * [persistOffline], so by the time we are draining every entry is one
+     * whose play legitimately happened.
+     */
+    private suspend fun drainOfflineQueue() {
+        if (Innertube.cookie == null) return
+        drainLock.withLock {
+            val entries = OfflinePlayQueue.snapshot()
+            if (entries.isEmpty()) return@withLock
+            TrackLog.d(TAG, "draining ${entries.size} offline play(s)")
+            for (entry in entries) {
+                val ok = runCatching { replayOne(entry) }
+                    .onFailure {
+                        TrackLog.w(TAG, "offline replay failed for ${entry.videoId}: ${it.message}")
+                    }
+                    .getOrDefault(false)
+                if (ok) OfflinePlayQueue.remove(entry.cpn)
+            }
+        }
+    }
+
+    /**
+     * One queued play, played back against the stats endpoints.
+     *
+     * The tracking URLs are fetched fresh — they rotate, and the signature
+     * timestamp a draft was written with is already out of date by the time
+     * the drain gets here. The CPN stored with the entry is what gets reused,
+     * so playback / atr / watchtime are a single play as far as YouTube is
+     * concerned.
+     *
+     * @return true when the entry has been sent and can be dropped from the
+     *   queue. False keeps it around for the next drain.
+     */
+    private suspend fun replayOne(entry: OfflinePlayQueue.Entry): Boolean {
+        val signatureTimestamp = StreamResolver.signatureTimestamp(entry.videoId) ?: return false
+        val tracking = Innertube.playbackTracking(entry.videoId, signatureTimestamp)
+        if (tracking == null) {
+            // The player declined this video on this account; asking later
+            // with the same inputs gets the same answer, so drop it.
+            TrackLog.d(TAG, "no playback tracking for queued ${entry.videoId}; dropping")
+            return true
+        }
+        Innertube.pingPlayback(tracking.playbackUrl, entry.cpn)
+        tracking.atrUrl?.let { runCatching { Innertube.pingAtr(it, entry.cpn) } }
+        val watchtimeUrl = tracking.watchtimeUrl
+        if (watchtimeUrl != null) {
+            Innertube.pingWatchtime(watchtimeUrl, entry.cpn, entry.watchtimeSeconds, final = true)
+        }
+        _registeredPlays.value++
+        TrackLog.d(
+            TAG,
+            "offline play replayed for ${entry.videoId} " +
+                "(${entry.watchtimeSeconds}s heard, cpn ${entry.cpn})",
+        )
+        return true
     }
 }

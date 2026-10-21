@@ -30,6 +30,7 @@ import com.music.bitchord.playback.BoundedContextPersistence
 import com.music.bitchord.playback.OriginalVersion
 import com.music.bitchord.data.innertube.Innertube
 import com.music.bitchord.data.innertube.AndroidStreamHooks
+import com.music.bitchord.data.innertube.PlaybackTracker
 import com.music.bitchord.data.listentogether.ListenTogether
 import com.music.bitchord.data.scrobbling.LastFM
 import com.music.bitchord.data.settings.AppSettings
@@ -116,6 +117,13 @@ class BitChordApplication : Application(), SingletonImageLoader.Factory {
             CoroutineScope(Dispatchers.IO).launch { Innertube.ensureSessionScope() }
         }
         AppSettings.init(this, authStore)
+        // Opens the offline-play queue and starts the "drain whenever we are
+        // online" observer. After AppSettings because the observer reads
+        // [AppSettings.meteredConnection], and nothing writes to the queue
+        // before this process has either played something or come back from
+        // disk — a previous launch's leftovers are flushed by the same
+        // observer on the first connectivity reading.
+        PlaybackTracker.start(this)
         // Before anything resolves a track: an addon with `checkValidLossless`
         // is gated on this, and the gate reads "no" until it has looked.
         com.music.bitchord.playback.audio.LosslessOutput.init(this)
