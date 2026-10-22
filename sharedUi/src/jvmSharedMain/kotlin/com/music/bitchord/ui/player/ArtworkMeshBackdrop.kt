@@ -157,14 +157,12 @@ fun FullArtworkBlurBackdrop(
             )
         }
 
-        // Lyrics and queue are dense white foregrounds. Preserve the cover's
-        // colour and layout, but keep bright sleeves from lowering contrast.
         Canvas(Modifier.fillMaxSize()) {
             drawRect(
                 brush = Brush.verticalGradient(
-                    0f to Color.Black.copy(alpha = 0.34f),
-                    0.55f to Color.Black.copy(alpha = 0.48f),
-                    1f to Color.Black.copy(alpha = 0.64f),
+                    0f to Color.Black.copy(alpha = 0.15f),
+                    0.55f to Color.Black.copy(alpha = 0.28f),
+                    1f to Color.Black.copy(alpha = 0.45f),
                 ),
             )
         }
@@ -430,23 +428,20 @@ private fun DrawScope.drawMesh(mesh: ArtworkMesh, seamY: Float, alpha: Float) {
 /** Drawn only until an artwork has been read — never a colour anyone chose. */
 private val FallbackBackdrop = Color(0xFF121212)
 
-/** A screen cannot recover detail discarded here; small is the performance feature. */
-private const val FULL_BLUR_SOURCE_PX = 128
-private const val FULL_BLUR_PASSES = 3
+private const val FULL_BLUR_SOURCE_PX = 256
+private const val FULL_BLUR_PASSES = 1
 
-/** A handful of recent covers; each entry is only 64 KiB at 128x128 ARGB. */
 private val fullBlurCache = object : LinkedHashMap<String, ImageBitmap>(0, 0.75f, true) {
     override fun removeEldestEntry(eldest: Map.Entry<String, ImageBitmap>) = size > 8
 }
 
-/** Three small box passes approximate a broad Gaussian blur at thumbnail scale. */
 private fun ImageBitmap.boxBlurred(passes: Int): ImageBitmap {
     val width = width
     val height = height
     if (width < 2 || height < 2) return this
     var source = argbPixels()
     var target = IntArray(source.size)
-    val radius = (minOf(width, height) / 12).coerceAtLeast(2)
+    val radius = (minOf(width, height) / 32).coerceAtLeast(2)
 
     repeat(passes) {
         boxBlurPass(source, target, width, height, radius, horizontal = true)

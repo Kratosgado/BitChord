@@ -1164,7 +1164,7 @@ fun NowPlayingScreen(
     // which takes the clip away — brings the still frame back in the very frame
     // the clip goes, instead of a frame later with the sleeve behind it still
     // transparent and no artwork anywhere.
-    val heroClip = canvas?.takeIf { heroMode && !collapsePastHalf }
+    val heroClip = canvas?.takeIf { heroMode && (!collapsePastHalf || lyricsOpen || queueOpen) }
     val spotifyCanvasFullscreen = spotifyCanvasOnPhone &&
         heroClip?.source == CanvasSource.SPOTIFY
     val spotifyCanvasPresentation = spotifyCanvasFullscreen && canvasRendered
@@ -1748,8 +1748,10 @@ fun NowPlayingScreen(
         // retained layers' alpha changes when a panel opens, so the full-cover
         // blur is neither rebuilt nor switched in on a hard frame boundary.
         // The tablet has no mirrored main-player treatment to crossfade from.
+        val canvasBehindPanel = heroClip != null && (lyricsOpen || queueOpen)
         val fullArtworkBackdropAlpha by animateFloatAsState(
             targetValue = if (
+                !canvasBehindPanel &&
                 (tabletArtworkBackdrop || lyricsOpen || queueOpen) &&
                 (tabletArtworkBackdrop || fullArtworkBlurImage != null)
             ) 1f else 0f,
@@ -1863,32 +1865,26 @@ fun NowPlayingScreen(
 
         }
 
-        // Mount once, behind the controls. A known portrait aspect changes the
-        // invisible view to full-player bounds before its first frame is shown.
-        if (heroMode && heroHeight > 0.dp) {
+        if (heroMode && (heroHeight > 0.dp || canvasBehindPanel)) {
             heroClip?.let { clip ->
                 CanvasArtworkPlayer(
                     canvas = clip,
                     isPlaying = isPlaying,
-                    // Paused for the whole collapse into the queue/lyrics panel
-                    // and back, not just once it hands off to the still frame at
-                    // p >= 0.5 — see [CanvasArtworkPlayer.pausedForTransition].
-                    pausedForTransition = collapseStarted,
-                    // Spotify's 9:16 Canvas is the phone background, so it
-                    // covers every edge. Other providers retain the contained
-                    // portrait treatment introduced for motion cover art.
-                    contentMode = if (spotifyCanvasFullscreen) {
-                        CanvasContentMode.CROP
-                    } else {
-                        CanvasContentMode.FIT_PORTRAIT
+                    pausedForTransition = collapseStarted && !lyricsOpen && !queueOpen,
+                    contentMode = when {
+                        canvasBehindPanel -> CanvasContentMode.CROP
+                        spotifyCanvasFullscreen -> CanvasContentMode.CROP
+                        else -> CanvasContentMode.FIT_PORTRAIT
                     },
                     alignPortraitTop = canvasFirstPortrait,
                     onAspectRatioChanged = { canvasAspect = it },
                     portraitRevealBounds = playerBounds,
-                    presentationAlpha = if (spotifyCanvasFullscreen || canvasFirstPortrait) {
-                        { (1f - 2f * p()).coerceIn(0f, 1f) }
-                    } else {
-                        { 1f }
+                    presentationAlpha = when {
+                        canvasBehindPanel -> { { 1f } }
+                        spotifyCanvasFullscreen || canvasFirstPortrait -> {
+                            { (1f - 2f * p()).coerceIn(0f, 1f) }
+                        }
+                        else -> { { 1f } }
                     },
                     onRenderedChanged = { canvasRendered = it },
                     onFrameCaptured = {
@@ -1896,9 +1892,6 @@ fun NowPlayingScreen(
                             !lyricsOpen && !queueOpen
                         ) canvasFrame = it
                     },
-                    // The full-screen Spotify video has no mesh to re-tint.
-                    // Keeping this null also removes the old three-second GPU
-                    // readback cadence from this provider alone.
                     refreshFrameEveryMs = if (
                         spotifyCanvasFullscreen || tabletArtworkBackdrop || lyricsOpen || queueOpen
                     ) {
@@ -1908,20 +1901,36 @@ fun NowPlayingScreen(
                     },
                     onCoverChanged = { canvasCover.floatValue = it },
                     bottomFade = when {
+                        canvasBehindPanel -> 0f
                         spotifyCanvasFullscreen -> 0f
                         canvasFirstPortrait -> canvasFirstFadeFraction
                         else -> HERO_FADE_FRACTION
                     },
-                    bottomFadeEndPx = if (canvasFirstPortrait) with(density) { renderedCanvasBottom.toPx() }
-                        else null,
+                    bottomFadeEndPx = if (canvasFirstPortrait && !canvasBehindPanel) {
+                        with(density) { renderedCanvasBottom.toPx() }
+                    } else null,
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .then(
-                            if (spotifyCanvasFullscreen || canvasFirstPortrait) Modifier.fillMaxSize()
-                            else Modifier.fillMaxWidth().height(heroHeight),
+                            if (canvasBehindPanel || spotifyCanvasFullscreen || canvasFirstPortrait) {
+                                Modifier.fillMaxSize()
+                            } else {
+                                Modifier.fillMaxWidth().height(heroHeight)
+                            },
                         )
                         .hazeSource(playerHaze),
                 )
+                if (canvasBehindPanel) {
+                    androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
+                        drawRect(
+                            brush = Brush.verticalGradient(
+                                0f to Color.Black.copy(alpha = 0.45f),
+                                0.5f to Color.Black.copy(alpha = 0.55f),
+                                1f to Color.Black.copy(alpha = 0.65f),
+                            ),
+                        )
+                    }
+                }
             }
         }
 
