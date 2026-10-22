@@ -186,12 +186,7 @@ class AndroidPlayerHost(context: Context) : PlayerHost {
 
     private val _lyricsShareRequest = MutableStateFlow<LyricsShareRequest?>(null)
 
-    /**
-     * The pending lyrics-share card, or null when no sheet is up. The Android
-     * NowPlaying host collects this and renders [LyricsShareSheet]; dismissing
-     * the sheet calls [dismissLyricsShare] to clear it.
-     */
-    internal val lyricsShareRequest: StateFlow<LyricsShareRequest?> = _lyricsShareRequest.asStateFlow()
+    override val pendingLyricsShare: StateFlow<LyricsShareRequest?> = _lyricsShareRequest.asStateFlow()
 
     override fun shareLyrics(song: Song, lines: List<LyricsShareLinePayload>) {
         _lyricsShareRequest.value = LyricsShareRequest(
@@ -201,7 +196,7 @@ class AndroidPlayerHost(context: Context) : PlayerHost {
         )
     }
 
-    fun dismissLyricsShare() {
+    override fun dismissLyricsShare() {
         _lyricsShareRequest.value = null
     }
 

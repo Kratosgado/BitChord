@@ -4,7 +4,11 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.LinearGradient
 import android.graphics.Paint
+import android.graphics.Rect
+import android.graphics.RectF
+import android.graphics.Shader
 import com.music.bitchord.ui.replay.Fonts
 import com.music.bitchord.ui.replay.drawArtwork
 import com.music.bitchord.ui.replay.drawBackdrop
@@ -15,39 +19,6 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/**
- * The picked lines as one picture, drawn to a bitmap you can send.
- *
- * ## Why this is drawn rather than screenshotted
- *
- * The same reason the Replay is. A screenshot of the lyrics panel carries the
- * scrubber, the glow falloff, whichever lines happened to be on screen and the
- * status bar of that particular phone, so two people sharing the same verse
- * would send two different-looking pictures. A card laid out here is the verse,
- * the sleeve and this app's mark, and nothing else — and it is only as tall as
- * that verse needs, which holds it inside 1080×1920 (9:16): the shape a story
- * or a chat head expects. Keeping it there is the player's job, by refusing
- * more words at the pick rather than by shrinking them here.
- *
- * ## Why it isn't Compose
- *
- * `Bitmap` + `android.graphics.Canvas`, exactly as [com.music.bitchord.ui.replay.ReplayPoster]
- * does it, and for the same reasons written up there: Compose offscreen on
- * minSdk 26 is a cascade of hardware bitmaps and layers that fails differently
- * per device, while a software canvas draws identically from API 26 up. The
- * backdrop, the logo, the fonts and the sleeve are shared with the Replay by
- * importing them rather than by copying, so the two cards cannot drift apart.
- *
- * ## Fitting the type
- *
- * A passage can be one line or twenty, so both the size and the height are
- * chosen rather than fixed: the layout is retried down a fixed ladder of sizes
- * until the rows stop overflowing, and the card is then grown to exactly the
- * room those rows take. The bottom rung of that ladder is a floor rather than
- * a last resort — no card ever sets type smaller than it to squeeze a passage
- * in, so a passage too long for the frame lengthens the card instead of being
- * cut, or made small enough to hold a phone at arm's length to read.
- */
 internal suspend fun renderLyricsShareCard(
     context: Context,
     card: LyricsShareRequest,
@@ -56,31 +27,28 @@ internal suspend fun renderLyricsShareCard(
     val type = Fonts(context)
     val cover = card.artworkUrl?.let { loadBitmap(context, it) }
 
-    // ── Sizing ──────────────────────────────────────────────────────────────
-    // No room is reserved for the words to sit in: they get their own height,
-    // and the card is built down from that number. A chorus comes out a strip
-    // barely taller than its own text instead of a 9:16 sheet with a paragraph
-    // floating in the middle of it, and the size comes down only as far as the
-    // ladder goes — past that the frame gives rather than the type does.
     val bodyTop = HEADER_BOTTOM + GAP_ABOVE_BODY
     val frameRoom = MAX_CARD_H - FOOTER_THUMB - FOOTER_PAD - GAP_BELOW_BODY - bodyTop
     val plan = fittestPlan(type, card.lines, frameRoom)
-    // The passage ends where its own rows end, and everything under it — the
-    // gap, the sleeve credit, the foot — hangs off that. Because the card is
-    // measured from the same sum the rows are drawn from, no line can ever
-    // land past the bottom by a rounding error and be replaced by a mark
-    // saying something was left out.
-    val bodyBottom = bodyTop + plan.content
-    val cardH = bodyBottom + GAP_BELOW_BODY + FOOTER_THUMB + FOOTER_PAD
+    val cardH = bodyTop + plan.content + GAP_BELOW_BODY + FOOTER_THUMB + FOOTER_PAD
 
-    val bitmap = Bitmap.createBitmap(CARD_W, cardH.roundToInt(), Bitmap.Config.ARGB_8888)
+    val outH = if (story) STORY_H else cardH.roundToInt().coerceAtMost(MAX_CARD_H.roundToInt())
+    val thumbY: Float
+    val lyricsStartY: Float
+    if (story) {
+        thumbY = outH - FOOTER_PAD - FOOTER_THUMB
+        val areaTop = HEADER_BOTTOM + GAP_ABOVE_BODY
+        val areaBottom = thumbY - GAP_BELOW_BODY
+        lyricsStartY = areaTop + ((areaBottom - areaTop - plan.content) / 2f).coerceAtLeast(0f)
+    } else {
+        thumbY = cardH - FOOTER_PAD - FOOTER_THUMB
+        lyricsStartY = bodyTop
+    }
+
+    val bitmap = Bitmap.createBitmap(CARD_W, outH, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
-    drawBackdrop(canvas, cover, 0f, cardH)
+    drawLyricsBackdrop(canvas, cover, CARD_W, outH.toFloat())
 
-    // ── Header ──────────────────────────────────────────────────────────────
-    // The mark alone, at the top right — the same one the Replay carries, so
-    // two of these cards still read as one family. Nothing else goes above
-    // the passage: the picture is the verse, not a caption for it.
     val brand = type.heading(46f, 0xE6FFFFFF.toInt()).apply {
         textAlign = Paint.Align.RIGHT
     }
@@ -92,11 +60,7 @@ internal suspend fun renderLyricsShareCard(
         HEADER_BASELINE,
     )
 
-    // ── The passage ─────────────────────────────────────────────────────────
-    // Every row that exists is drawn: the frame below is measured from
-    // wherever these rows end, so there is never room to be short of and
-    // nothing that has to be cut to make it.
-    var y = bodyTop
+    var y = lyricsStartY
     for (row in plan.rows) {
         val baseline = y + row.gapBefore - row.paint.ascent() +
             if (row.isGap) row.paint.textSize * GAP_MARKER_OFFSET else 0f
@@ -105,9 +69,6 @@ internal suspend fun renderLyricsShareCard(
         y += row.gapBefore + row.height
     }
 
-    // ── Footer ──────────────────────────────────────────────────────────────
-    // Which song this is — which only the backdrop had been saying until now.
-    val thumbY = cardH - FOOTER_PAD - FOOTER_THUMB
     drawArtwork(canvas, cover, card.song.title, CARD_MARGIN, thumbY, FOOTER_THUMB, false)
     val textX = CARD_MARGIN + FOOTER_THUMB + 34f
     val room = CARD_W - CARD_MARGIN - textX
@@ -117,6 +78,46 @@ internal suspend fun renderLyricsShareCard(
     canvas.drawText(ellipsised(card.song.artist, artist, room), textX, thumbY + 132f, artist)
 
     bitmap
+}
+
+private fun drawLyricsBackdrop(
+    canvas: Canvas,
+    cover: Bitmap?,
+    width: Int,
+    height: Float,
+) {
+    if (cover == null) {
+        drawBackdrop(canvas, null, 0f, height)
+        return
+    }
+    val minSide = minOf(cover.width, cover.height)
+    val cropX = (cover.width - minSide) / 2
+    val cropY = (cover.height - minSide) / 2
+    val src = Rect(cropX, cropY, cropX + minSide, cropY + minSide)
+    val sampling = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG)
+
+    val widthF = width.toFloat()
+    val frameAspect = widthF / height
+    val fillRect = if (frameAspect >= 1f) {
+        RectF(0f, (height - widthF) / 2f, widthF, (height + widthF) / 2f)
+    } else {
+        RectF((widthF - height) / 2f, 0f, (widthF + height) / 2f, height)
+    }
+    canvas.drawBitmap(cover, src, fillRect, sampling)
+
+    val scrim = Paint(Paint.ANTI_ALIAS_FLAG)
+    scrim.color = BACKDROP_SCRIM
+    canvas.drawRect(0f, 0f, widthF, height, scrim)
+    scrim.shader = LinearGradient(
+        0f,
+        0f,
+        0f,
+        height,
+        intArrayOf(0x80000000.toInt(), 0x40000000, 0xB3000000.toInt()),
+        floatArrayOf(0f, 0.42f, 1f),
+        Shader.TileMode.CLAMP,
+    )
+    canvas.drawRect(0f, 0f, widthF, height, scrim)
 }
 
 // ── Fitting ──────────────────────────────────────────────────────────────────
@@ -257,6 +258,8 @@ private const val CARD_W = 1080
  */
 private const val MAX_CARD_H = 1920f
 
+private const val STORY_H = 1920
+
 private const val CARD_MARGIN = 72f
 private const val CARD_CONTENT_W = CARD_W - CARD_MARGIN * 2
 
@@ -280,6 +283,8 @@ private const val SUB_FLOOR = 24f
 
 /** Small visual correction so the omission marker sits below the line above. */
 private const val GAP_MARKER_OFFSET = 0.18f
+
+private const val BACKDROP_SCRIM = 0x66000000.toInt()
 
 /**
  * The sizes tried, largest first.

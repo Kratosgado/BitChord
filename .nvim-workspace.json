@@ -1,6 +1,13 @@
 {
   "folders": ["/home/esslifie/projects/apps/BitChord"],
   "name": "BitChord",
+  "keymaps": [
+    {
+      "lhs": "<leader>Fr",
+      "rhs": ":WorkspaceTask install<CR>",
+      "desc": "Run on emulator"
+    }
+  ],
   "tasks": [
     {
       "name": "emulator",
@@ -10,12 +17,12 @@
     {
       "name": "install",
       "folder": "BitChord",
-      "cmd": "./gradlew installProdDebug && adb logcat -c && adb shell am start -n com.music.bitchord/com.music.bitchord.MainActivity && adb logcat --pid=$(adb shell pidof com.music.bitchord)"
+      "cmd": "./gradlew :app:installProdDebug && adb logcat -c && adb shell am start -W -n com.music.bitchord/com.music.bitchord.MainActivity && pid=; for i in 1 2 3 4 5 6 7 8 9 10; do pid=$(adb shell pidof com.music.bitchord | tr -d '\\r'); [ -n \"$pid\" ] && break; sleep 0.3; done; [ -n \"$pid\" ] && adb logcat --pid=\"$pid\" || echo \"com.music.bitchord did not start\""
     },
     {
       "name": "build",
       "folder": "BitChord",
-      "cmd": "./gradlew assembleProdDebug"
+      "cmd": "./gradlew :app:assembleProdDebug"
     },
     {
       "name": "desktop",

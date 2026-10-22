@@ -88,6 +88,10 @@ interface PlayerHost {
     /** Show the lyrics-share sheet for [song] with the reader's picked [lines]. Android renders a card; other platforms may no-op. */
     fun shareLyrics(song: Song, lines: List<LyricsShareLinePayload>)
 
+    val pendingLyricsShare: StateFlow<LyricsShareRequest?> get() = NoLyricsShare
+
+    fun dismissLyricsShare() = Unit
+
     /** Whether the lyrics share feature is available on this platform. */
     val lyricsShareAvailable: Boolean get() = false
 
@@ -125,6 +129,8 @@ interface PlayerHost {
 private val NoCast = MutableStateFlow(CastUi())
 
 private val NoWatch = MutableStateFlow(WatchOutputUi())
+
+private val NoLyricsShare = MutableStateFlow<LyricsShareRequest?>(null)
 
 /** What the output drawer needs to draw the watch's row. */
 data class WatchOutputUi(

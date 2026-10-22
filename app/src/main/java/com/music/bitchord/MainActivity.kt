@@ -299,7 +299,6 @@ import androidx.compose.ui.layout.onSizeChanged
 import com.music.bitchord.ui.player.LocalPlayerDock
 import com.music.bitchord.ui.player.PlayerDock
 import com.music.bitchord.ui.player.AndroidPlayerHost
-import com.music.bitchord.ui.player.LyricsShareSheet
 import com.music.bitchord.ui.player.PlayerPlatform
 import com.music.bitchord.ui.screens.DetailScreen
 import com.music.bitchord.ui.screens.sortedForDetail

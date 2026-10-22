@@ -1441,6 +1441,14 @@ fun NowPlayingScreen(
                 onDismiss = onDismissLyricsOffset,
             )
         }
+        val pendingLyricsShare by PlayerPlatform.host.pendingLyricsShare.collectAsStateWithLifecycle()
+        pendingLyricsShare?.let { request ->
+            PlayerPlatform.host.LyricsShareSheet(
+                hazeState = playerHaze,
+                request = request,
+                onDismiss = { PlayerPlatform.host.dismissLyricsShare() },
+            )
+        }
     }
 
     // A landscape window — a tablet, or a phone on its side — takes an entirely
