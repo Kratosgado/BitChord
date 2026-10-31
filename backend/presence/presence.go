@@ -18,18 +18,15 @@ type Platform uint8
 const (
 	Android Platform = iota + 1
 	PC
-	Browser
 )
 
-// ParsePlatform accepts only the platforms BitChord ships on.
+// ParsePlatform accepts only the platforms the apps ship on.
 func ParsePlatform(s string) (Platform, bool) {
 	switch s {
 	case "android":
 		return Android, true
 	case "pc":
 		return PC, true
-	case "browser":
-		return Browser, true
 	}
 	return 0, false
 }
@@ -51,7 +48,6 @@ type Counts struct {
 	Online    int   `json:"online"`
 	Android   int   `json:"android"`
 	PC        int   `json:"pc"`
-	Browser   int   `json:"browser"`
 	UpdatedAt int64 `json:"updatedAt"`
 }
 
@@ -112,12 +108,10 @@ func (t *Tracker) Sweep(nowMs int64) {
 			c.Android++
 		case PC:
 			c.PC++
-		case Browser:
-			c.Browser++
 		}
 	}
 	t.mu.Unlock()
-	c.Online = c.Android + c.PC + c.Browser
+	c.Online = c.Android + c.PC
 	t.counts.Store(&c)
 }
 

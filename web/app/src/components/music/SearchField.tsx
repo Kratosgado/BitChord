@@ -1,12 +1,11 @@
 import { Search, X } from 'lucide-react';
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useSuggestions } from '@/data/music/queries';
 import type { MusicItem } from '@/data/music/types';
 import { Artwork } from './Artwork';
 import { hrefFor } from './links';
-import { playTrack, toTrack } from './play';
-import { TrackMenu } from './TrackMenu';
+import { playTrack } from './play';
 
 type Option = { kind: 'query'; text: string; typed: string; rest: string } | { kind: 'item'; item: MusicItem };
 
@@ -23,17 +22,6 @@ export function SearchField({ initial, onSearch }: { initial: string; onSearch: 
   const listId = useId();
   const navigate = useNavigate();
   const suggestions = useSuggestions(open ? value : '');
-  // A suggestion's track menu takes focus when it opens (Menu focuses its
-  // first item), which would otherwise read as the field blurring and close
-  // the dropdown under the open menu. While a menu is open the blur close is
-  // held off; when the menu closes, its pick is done, so the dropdown
-  // closes with it.
-  const menuOpen = useRef(false);
-  const onMenuOpenChange = useCallback((isOpen: boolean) => {
-    const wasOpen = menuOpen.current;
-    menuOpen.current = isOpen;
-    if (!isOpen && wasOpen) setOpen(false);
-  }, []);
 
   useEffect(() => setValue(initial), [initial]);
 
@@ -44,7 +32,6 @@ export function SearchField({ initial, onSearch }: { initial: string; onSearch: 
   const showList = open && value.trim().length > 0 && options.length > 0;
 
   const pick = (option: Option | undefined) => {
-    if (menuOpen.current) return;
     setOpen(false);
     setActive(-1);
     if (!option) return onSearch(value.trim());
@@ -87,7 +74,7 @@ export function SearchField({ initial, onSearch }: { initial: string; onSearch: 
             setActive(-1);
           }}
           onFocus={() => setOpen(true)}
-          onBlur={() => setTimeout(() => { if (!menuOpen.current) setOpen(false); }, 120)}
+          onBlur={() => setTimeout(() => setOpen(false), 120)}
           onKeyDown={(e) => {
             if (e.key === 'ArrowDown') {
               e.preventDefault();
@@ -121,16 +108,13 @@ export function SearchField({ initial, onSearch }: { initial: string; onSearch: 
           className="absolute top-[calc(100%+3px)] left-0 z-(--z-contextual-menus) max-h-[min(700px,70vh)] w-[302px] overflow-y-auto rounded-[9px] border border-[#00000033] bg-thick-material py-1.5 shadow-[inset_0_0_0_1px_#ffffff33,0_8px_40px_#0000008c] [backdrop-filter:blur(60px)_saturate(2.2)]"
           role="listbox"
         >
-          {options.map((option, i) => {
-            const item = option.kind === 'item' ? option.item : null;
-            const playable = item !== null && (item.kind === 'song' || item.kind === 'video');
-            return (
+          {options.map((option, i) => (
             <li
               key={option.kind === 'query' ? `q-${option.text}` : `i-${option.item.id}`}
               id={`${listId}-${i}`}
               role="option"
               aria-selected={i === active}
-              className={option.kind === 'query' ? hint : `${lockup} ${playable ? lockupMenuCols : lockupCols}`}
+              className={option.kind === 'query' ? hint : lockup}
               data-active={i === active || undefined}
               onMouseDown={(e) => e.preventDefault()}
               onMouseEnter={() => setActive(i)}
@@ -157,18 +141,10 @@ export function SearchField({ initial, onSearch }: { initial: string; onSearch: 
                     <span className="truncate type-body">{option.item.title}</span>
                     <span className="mt-px truncate type-callout text-secondary group-data-active/option:text-white">{option.item.subtitle || kindLabel(option.item.kind)}</span>
                   </div>
-                  {playable && item && (
-                    <TrackMenu
-                      track={toTrack(item)}
-                      onOpenChange={onMenuOpenChange}
-                      className="grid size-7 place-items-center rounded-full text-secondary opacity-0 transition-opacity duration-100 ease-in group-hover/option:opacity-100 group-data-active/option:text-white focus-visible:opacity-100 hover:bg-quinary group-data-active/option:hover:bg-white/20 data-open:opacity-100"
-                    />
-                  )}
                 </>
               )}
             </li>
-            );
-          })}
+          ))}
         </ul>
       )}
     </div>
@@ -178,9 +154,7 @@ export function SearchField({ initial, onSearch }: { initial: string; onSearch: 
 // A suggestion row; hover or keyboard selection paints it in the key colour, white text.
 const optionRow = 'group/option mx-1.5 cursor-default rounded-[3px] data-active:bg-key-bg data-active:text-white';
 const hint = `${optionRow} grid grid-cols-[16px_minmax(0,1fr)] items-center p-1 type-body text-secondary`;
-const lockup = `${optionRow} mt-1.5 grid items-center gap-x-2.5 p-1.5`;
-const lockupCols = 'grid-cols-[46px_minmax(0,1fr)]';
-const lockupMenuCols = 'grid-cols-[46px_minmax(0,1fr)_auto]';
+const lockup = `${optionRow} mt-1.5 grid grid-cols-[46px_minmax(0,1fr)] items-center gap-x-2.5 p-1.5`;
 
 function kindLabel(kind: MusicItem['kind']): string {
   return { song: 'Song', video: 'Video', album: 'Album', playlist: 'Playlist', 'spotify-playlist': 'Spotify Playlist', artist: 'Artist', episode: 'Episode', podcast: 'Podcast', unknown: '' }[kind];

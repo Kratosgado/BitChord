@@ -1,35 +1,21 @@
 package com.music.bitchord.ui.components
 
-import androidx.compose.ui.layout.ContentScale
 import com.music.bitchord.ui.LocalPullToRefreshEnabled
 import com.music.bitchord.ui.AppUiHost
 import com.music.bitchord.ui.AppUi
 import com.music.bitchord.sharedui.resources.*
-import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.text.font.FontWeight
-import com.music.bitchord.ui.player.MESH_CYCLE_MILLIS
-import com.music.bitchord.ui.player.MeshGradientBackground
-import com.music.bitchord.ui.player.WelcomeMeshPalettes
-import com.music.bitchord.ui.player.cyclingMeshPalette
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.foundation.Canvas
-import androidx.compose.runtime.compositionLocalOf
-import androidx.compose.runtime.mutableLongStateOf
-import androidx.compose.runtime.withFrameNanos
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import kotlinx.coroutines.delay
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.keyframes
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.ui.layout.layout
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.DownloadDone
 import androidx.compose.material.icons.rounded.CheckCircle
@@ -52,7 +38,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.snapshotFlow
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.music.bitchord.ui.haptics.Haptic
@@ -61,7 +46,6 @@ import kotlin.math.abs
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -99,10 +83,6 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.music.bitchord.data.model.ROW_ART_PX
 import com.music.bitchord.data.model.Song
-import com.music.bitchord.data.model.isMatchPending
-import com.music.bitchord.data.model.isMatchMissing
-import androidx.compose.ui.draw.alpha
-import androidx.compose.material3.CircularProgressIndicator
 import com.music.bitchord.data.model.artworkAt
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.composed
@@ -110,32 +90,21 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.foundation.border
 
 /**
- * The left and right inset every page's content sits at — the artist page's
- * edge, which every other page now shares, so a track row, a card or a
- * heading starts at the same place whichever page it is on.
+ * The left and right inset every page's content sits at.
+ *
+ * It is the same inset the mini player and the tab bar float at, so the edge of
+ * a track row, a card or a heading lines up with the edge of the bars stacked
+ * below them rather than stepping in from them. One constant, shared by the
+ * bars and the pages, is what keeps that true.
  */
-val PAGE_GUTTER = 16.dp
+val PAGE_GUTTER = 10.dp
 
-/**
- * The inset the floating chrome sits at: the mini player, the tab bar and the
- * top bar's controls. The same as [PAGE_GUTTER], so the bars' edges line up
- * with the content scrolling beneath them rather than sitting just outside it.
- */
 val BAR_GUTTER = PAGE_GUTTER
+val TRACK_NUMBER_WIDTH = 24.dp
+val NUMBERED_ROW_DIVIDER_INSET = PAGE_GUTTER + TRACK_NUMBER_WIDTH + PAGE_GUTTER
 
 /** Where a divider under a track row starts: clear of the 52dp of artwork. */
 val ROW_DIVIDER_INSET = PAGE_GUTTER + 68.dp
-
-/**
- * A numbered row's track-number column, the number centred in it: room for
- * three digits. It sits between two page gutters — the row's own on the left,
- * a matching gap before the title on the right — so the number has the same
- * space either side of it, counted from the screen edge.
- */
-val TRACK_NUMBER_WIDTH = 24.dp
-
-/** Where a divider under a numbered row starts: at its title, past the number. */
-val NUMBERED_ROW_DIVIDER_INSET = PAGE_GUTTER + TRACK_NUMBER_WIDTH + PAGE_GUTTER
 
 /**
  * How wide the floating bars at the foot of the page — the tab bar and the mini
@@ -161,14 +130,6 @@ val FLOATING_BAR_MAX_WIDTH = 440.dp
  * showing: enough to say the row scrolls without a card being half a card.
  */
 val SHELF_CARD_WIDTH = 150.dp
-
-/**
- * A track's thumbnail box at [height]: square for a song, 16:9 at the same
- * height for a music video — its picture's own shape, as YouTube Music lists
- * one, rather than a still cropped into a square.
- */
-fun Modifier.trackArtSize(height: Dp, isVideo: Boolean): Modifier =
-    if (isVideo) size(width = height * (16f / 9f), height = height) else size(height)
 
 /** Share of the row a lead-shelf card takes, so the next one peeks in past it. */
 private const val HERO_CARD_FRACTION = 0.70f
@@ -338,65 +299,13 @@ fun SongRow(
     isCurrent: Boolean = false,
     /** Distinguishes active playback from the same current item while paused. */
     isPlaying: Boolean = false,
-    /** Accent supplied by artwork-tinted pages. */
-    activeTint: Color = MaterialTheme.colorScheme.primary,
     /** Search results use artwork bars instead of the usual current-song icon. */
     searchPlayingStyle: Boolean = false,
+    /** Accent supplied by artwork-tinted pages. */
+    activeTint: Color = MaterialTheme.colorScheme.primary,
     /** True while a Downloads row belongs to the current multi-selection. */
     selected: Boolean = false,
-    /**
-     * Leads the artist line with the tier the row's source offered — Lossless,
-     * Hi-Res Lossless, Dolby Atmos, High quality — for lists where rows from
-     * different catalogues sit side by side: the Addons search.
-     */
-    showSourceQuality: Boolean = false,
-    /**
-     * A control of the page's own, drawn just ahead of the ⋮ — the Cached
-     * songs folder's per-track download button. Null on every other list.
-     */
-    trailing: (@Composable () -> Unit)? = null,
 ) {
-    SwipeToQueueBox(
-        onSwipeToQueue = onSwipeToQueue,
-        modifier = modifier,
-    ) {
-        SongRowContent(
-            song = song,
-            onClick = onClick,
-            onLongPress = onLongPress,
-            onMore = onMore ?: onLongPress,
-            modifier = if (onSwipeToQueue != null) Modifier.background(rowBackground) else modifier,
-            trackNumber = trackNumber,
-            subtitleColor = subtitleColor,
-            downloadedTint = downloadedTint,
-            isCurrent = isCurrent,
-            isPlaying = isPlaying,
-            activeTint = activeTint,
-            searchPlayingStyle = searchPlayingStyle,
-            selected = selected,
-            showSourceQuality = showSourceQuality,
-            trailing = trailing,
-        )
-    }
-}
-
-/**
- * Wraps content with a swipe gesture revealing [QueueSwipeBackground] that
- * triggers [onSwipeToQueue] when swiped past 45% of width and snaps back.
- * If [onSwipeToQueue] is null, renders [content] directly.
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun SwipeToQueueBox(
-    onSwipeToQueue: (() -> Unit)?,
-    modifier: Modifier = Modifier,
-    content: @Composable () -> Unit,
-) {
-    if (onSwipeToQueue == null) {
-        content()
-        return
-    }
-
     val haptics = rememberHaptics()
     val swipeStateHolder = remember { mutableStateOf<SwipeToDismissBoxState?>(null) }
     var boxWidth by remember { mutableFloatStateOf(0f) }
@@ -418,6 +327,25 @@ fun SwipeToQueueBox(
         positionalThreshold = { distance -> distance * 0.5f },
     )
     swipeStateHolder.value = swipeState
+
+    if (onSwipeToQueue == null) {
+        SongRowContent(
+            song = song,
+            onClick = onClick,
+            onLongPress = onLongPress,
+            onMore = onMore ?: onLongPress,
+            modifier = modifier,
+            trackNumber = trackNumber,
+            subtitleColor = subtitleColor,
+            downloadedTint = downloadedTint,
+            isCurrent = isCurrent,
+            isPlaying = isPlaying,
+            searchPlayingStyle = searchPlayingStyle,
+            activeTint = activeTint,
+            selected = selected,
+        )
+        return
+    }
 
     // The row reveals "Queue" from the first pixel of the drag, but it only
     // *commits* past 45% of the width — so without this the label is a promise
@@ -448,7 +376,21 @@ fun SwipeToQueueBox(
         modifier = modifier.onSizeChanged { boxWidth = it.width.toFloat() },
         backgroundContent = { QueueSwipeBackground(swipeState) },
     ) {
-        content()
+        SongRowContent(
+            song = song,
+            onClick = onClick,
+            onLongPress = onLongPress,
+            onMore = onMore ?: onLongPress,
+            modifier = Modifier.background(rowBackground),
+            trackNumber = trackNumber,
+            subtitleColor = subtitleColor,
+            downloadedTint = downloadedTint,
+            isCurrent = isCurrent,
+            isPlaying = isPlaying,
+            searchPlayingStyle = searchPlayingStyle,
+            activeTint = activeTint,
+            selected = selected,
+        )
     }
 }
 
@@ -472,7 +414,7 @@ private fun QueueSwipeBackground(swipeState: SwipeToDismissBoxState) {
                 }
             }
             .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.18f))
-            .padding(horizontal = PAGE_GUTTER),
+            .padding(horizontal = PAGE_GUTTER + 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
@@ -512,49 +454,32 @@ private fun SongRowContent(
     downloadedTint: Color? = MaterialTheme.colorScheme.primary,
     isCurrent: Boolean = false,
     isPlaying: Boolean = false,
-    activeTint: Color = MaterialTheme.colorScheme.primary,
     searchPlayingStyle: Boolean = false,
+    activeTint: Color = MaterialTheme.colorScheme.primary,
     selected: Boolean = false,
-    showSourceQuality: Boolean = false,
-    trailing: (@Composable () -> Unit)? = null,
 ) {
     val titleColor by animateColorAsState(
-        targetValue = if (isCurrent && !searchPlayingStyle) activeTint else MaterialTheme.colorScheme.onBackground,
+        targetValue = if (isCurrent) activeTint else MaterialTheme.colorScheme.onBackground,
         label = "song row title",
     )
     val activeBackground by animateColorAsState(
-        targetValue = if ((isCurrent && !searchPlayingStyle) || selected) activeTint.copy(alpha = 0.14f) else Color.Transparent,
+        targetValue = if (isCurrent || selected) activeTint.copy(alpha = 0.14f) else Color.Transparent,
         label = "song row background",
     )
-    // A Spotify track still being matched to a YouTube Music song, or one that
-    // has no match: shown, but not something a tap or a menu can act on.
-    val matching = song.isMatchPending
-    val unavailable = song.isMatchMissing
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .alpha(if (unavailable) 0.45f else 1f)
             .background(activeBackground)
-            .longPressMenuClickable(
-                onClick = onClick,
-                onLongClick = onLongPress,
-                liftPadding = PaddingValues(horizontal = PAGE_GUTTER),
-            )
+            .combinedClickable(onClick = onClick, onLongClick = onLongPress)
             .contextClick(onMore ?: onLongPress)
             .padding(horizontal = PAGE_GUTTER, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (trackNumber != null) {
-            // Centred between the screen edge and the title (see
-            // [TRACK_NUMBER_WIDTH]). Same height as the artwork, so rows stay
-            // level.
-            Box(
-                Modifier.width(TRACK_NUMBER_WIDTH).height(52.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (searchPlayingStyle && isCurrent && isPlaying) {
-                    SearchPlayingBars()
-                } else if (isCurrent) {
+            // Same 52dp the artwork would take, so a numbered list and an
+            // illustrated one share a left edge and a divider inset.
+            Box(Modifier.size(52.dp), contentAlignment = Alignment.Center) {
+                if (isCurrent) {
                     Icon(
                         imageVector = if (isPlaying) Icons.Rounded.GraphicEq else Icons.Rounded.PlayArrow,
                         contentDescription = stringResource(Res.string.now_playing),
@@ -566,31 +491,21 @@ private fun SongRowContent(
                         text = "$trackNumber",
                         style = MaterialTheme.typography.bodyLarge,
                         color = subtitleColor,
-                        maxLines = 1,
                     )
                 }
             }
         } else {
-            Box(Modifier.trackArtSize(52.dp, song.isVideo)) {
-                AsyncImage(
-                    model = com.music.bitchord.ui.player.rememberRemoteArtworkUrl(song)?.artworkAt(ROW_ART_PX),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .matchParentSize()
-                        .clip(RoundedCornerShape(8.dp))
-                        .thumbnailBorder(RoundedCornerShape(8.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
-                )
-                if (searchPlayingStyle && isCurrent && isPlaying) {
-                    SearchPlayingBars(Modifier.align(Alignment.Center))
-                }
-            }
+            AsyncImage(
+                model = com.music.bitchord.ui.player.rememberRemoteArtworkUrl(song)?.artworkAt(ROW_ART_PX),
+                contentDescription = null,
+                modifier = Modifier
+                    .size(52.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .thumbnailBorder(RoundedCornerShape(8.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
+            )
         }
-        // A number is followed by the page gutter again, so the gap from the
-        // screen edge to the number and from the number to the title match,
-        // whatever its digit count.
-        Spacer(Modifier.width(if (trackNumber == null) 14.dp else PAGE_GUTTER))
+        Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
             ExplicitSongTitle(
                 song = song,
@@ -598,27 +513,16 @@ private fun SongRowContent(
                 color = titleColor,
             )
             Spacer(Modifier.height(2.dp))
-            val subtitle = listOfNotNull(
-                song.artist.takeIf { it.isNotBlank() },
-                song.downloadFormat,
-            ).joinToString(" · ")
-            val quality = if (showSourceQuality) song.sourceQualityBadge() else null
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (quality != null) {
-                    SourceQualityBadge(
-                        quality = quality,
-                        color = subtitleColor,
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
-                Text(
-                    text = if (quality != null && subtitle.isNotEmpty()) " · $subtitle" else subtitle,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = subtitleColor,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
+            Text(
+                text = listOfNotNull(
+                    song.artist.takeIf { it.isNotBlank() },
+                    song.downloadFormat,
+                ).joinToString(" · "),
+                style = MaterialTheme.typography.bodyMedium,
+                color = subtitleColor,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
         if (downloadedTint != null) {
             DownloadedBadge(song.videoId, downloadedTint)
@@ -632,7 +536,7 @@ private fun SongRowContent(
                 modifier = Modifier.size(20.dp),
             )
         }
-        if (isCurrent && trackNumber == null && !searchPlayingStyle) {
+        if (isCurrent && trackNumber == null) {
             Spacer(Modifier.width(8.dp))
             Icon(
                 imageVector = if (isPlaying) Icons.Rounded.GraphicEq else Icons.Rounded.PlayArrow,
@@ -641,161 +545,28 @@ private fun SongRowContent(
                 modifier = Modifier.size(20.dp),
             )
         }
-        if (matching) {
+        song.durationText?.let {
             Spacer(Modifier.width(8.dp))
-            CircularProgressIndicator(
-                modifier = Modifier.size(16.dp),
-                strokeWidth = 2.dp,
+            Text(
+                text = it,
+                style = MaterialTheme.typography.labelMedium,
                 color = subtitleColor,
             )
-        } else {
-            song.durationText?.let {
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    text = it,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = subtitleColor,
-                )
-            }
-        }
-        if (trailing != null && !matching && !unavailable) {
-            Spacer(Modifier.width(4.dp))
-            trailing()
         }
         // Same sheet the long-press opens, for anyone who doesn't think to hold.
-        if (onMore != null && !matching && !unavailable) {
-            RowMoreButton(onClick = onMore, tint = subtitleColor)
-        }
-    }
-}
-
-/**
- * The ⋮ at the end of a row. Its circle is a touch target nobody sees, so it
- * hangs [ROW_MORE_OUTSET] into the page gutter: the dots end at the row's
- * content edge, mirroring the artwork on the left, rather than a whole
- * button's width short of it — and the row's text gets that width back.
- */
-@Composable
-fun RowMoreButton(
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    tint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
-    iconSize: Dp = 20.dp,
-) {
-    Box(
-        modifier = modifier
-            .leftOutOfHeldPicture()
-            .hangIntoGutter(ROW_MORE_OUTSET)
-            .size(36.dp)
-            .menuAnchor()
-            .clip(CircleShape)
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            Icons.Rounded.MoreVert,
-            contentDescription = stringResource(Res.string.more),
-            tint = tint,
-            modifier = Modifier.size(iconSize),
-        )
-    }
-}
-
-/** How far a row's [RowMoreButton] reaches past the content edge into the gutter. */
-val ROW_MORE_OUTSET = 14.dp
-
-/**
- * Lays a trailing control out [outset] narrower than it draws, so it overhangs
- * its row's end edge by that much: for buttons whose glyph is far smaller than
- * their touch target, which would otherwise sit visibly inset from the edge.
- */
-fun Modifier.hangIntoGutter(outset: Dp): Modifier = layout { measurable, constraints ->
-    val placeable = measurable.measure(constraints)
-    val width = (placeable.width - outset.roundToPx()).coerceAtLeast(0)
-    layout(width, placeable.height) { placeable.place(0, 0) }
-}
-
-
-/**
- * The gap a decorative loop leaves after each of its frames before asking for
- * the next: 25ms lands the next frame on the vsync a thirtieth of a second on,
- * at 60, 90 and 120Hz alike.
- *
- * Every frame of anything inside the page is a frame of the whole page — the
- * glass bars sample it live, so they record it again and re-run their blur —
- * and asked for on every vsync, a 14dp glyph alone kept a 120Hz phone
- * redrawing the screen without pause until it ran hot and throttled. Nothing
- * that only decorates needs more than thirty.
- */
-const val MOTION_FRAME_GAP_MS = 25L
-
-/**
- * Whether the playing bars may move. Off while the row they sit in isn't
- * really being looked at — Now Playing pulled up over the page, the app in
- * the background, or the page on its way out — when they would go on
- * redrawing a page nobody can see. They hold where they are and carry on
- * from there when the page is back.
- */
-val LocalPlayingBarsMotion = compositionLocalOf { true }
-
-/** Each bar's lowest point; all three peak at full height. */
-private val PLAYING_BAR_MINIMUMS = floatArrayOf(0.38f, 0.78f, 0.52f)
-
-/**
- * Bar [index]'s height at [ms]: up from [minimum] to full and back down over
- * its own period, then the same again in reverse, so the three drift in and
- * out of step rather than marching.
- */
-private fun playingBarHeight(index: Int, minimum: Float, ms: Long): Float {
-    val duration = 520 + index * 130
-    val peak = 260 + index * 50
-    var t = (ms % (2L * duration)).toInt()
-    if (t > duration) t = 2 * duration - t
-    return if (t <= peak) {
-        minimum + (1f - minimum) * t / peak
-    } else {
-        1f - (1f - minimum) * (t - peak) / (duration - peak)
-    }
-}
-
-@Composable
-fun SearchPlayingBars(modifier: Modifier = Modifier) {
-    // Time in motion rather than an animation per bar: read only in the draw
-    // below, so a frame of it redraws this canvas and never recomposes or
-    // re-lays out the row it sits in.
-    val elapsedNanos = remember { mutableLongStateOf(0L) }
-    val running = LocalPlayingBarsMotion.current
-    LaunchedEffect(running) {
-        if (!running) return@LaunchedEffect
-        var last = Long.MIN_VALUE
-        while (true) {
-            withFrameNanos { now ->
-                if (last != Long.MIN_VALUE) elapsedNanos.longValue += now - last
-                last = now
-            }
-            delay(MOTION_FRAME_GAP_MS)
-        }
-    }
-    // The plate is a fixed square so only the bars move, never the box around them.
-    Box(
-        modifier = modifier
-            .size(24.dp)
-            .clip(RoundedCornerShape(6.dp))
-            .background(Color.Black.copy(alpha = 0.52f)),
-        contentAlignment = Alignment.Center,
-    ) {
-        Canvas(Modifier.size(width = 13.dp, height = 14.dp)) {
-            val barWidth = 3.dp.toPx()
-            val step = barWidth + 2.dp.toPx()
-            val corner = CornerRadius(minOf(2.dp.toPx(), barWidth / 2f))
-            val ms = elapsedNanos.longValue / 1_000_000L
-            PLAYING_BAR_MINIMUMS.forEachIndexed { index, minimum ->
-                val height = size.height * playingBarHeight(index, minimum, ms)
-                drawRoundRect(
-                    color = Color.White,
-                    topLeft = Offset(index * step, size.height - height),
-                    size = Size(barWidth, height),
-                    cornerRadius = corner,
+        if (onMore != null) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .clickable(onClick = onMore),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Rounded.MoreVert,
+                    contentDescription = stringResource(Res.string.more),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp),
                 )
             }
         }
@@ -860,80 +631,35 @@ fun PullToRefresh(
     }
 }
 
-/**
- * The prompt atop Home while signed out: a card in the welcome pages' living
- * mesh, so the one thing Home asks of a signed-out listener looks like an
- * invitation from the app rather than a settings row that wandered in.
- *
- * Drawn white-on-colour in either theme, like Replay and the welcome — the
- * mesh is the card, and white type is what sits on colour.
- */
+/** Slim dismissible-looking prompt shown atop Home while signed out. */
 @Composable
-fun SignInBanner(
-    onSignIn: () -> Unit,
-    modifier: Modifier = Modifier,
-    /**
-     * Whether the mesh may move. Off, it finishes the fade it is in and rests:
-     * a blurred layer re-drawn every frame is not something to leave running
-     * under a scroll, or under the player where nobody sees it.
-     */
-    motion: Boolean = true,
-) {
-    val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) 0.98f else 1f, spring(stiffness = 900f), label = "signInScale")
-    Box(
+fun SignInBanner(onSignIn: () -> Unit, modifier: Modifier = Modifier) {
+    Row(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = PAGE_GUTTER, vertical = 8.dp)
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-            }
-            .clip(RoundedCornerShape(22.dp))
-            .clickable(interactionSource = interaction, indication = null, onClick = onSignIn),
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .clickable(onClick = onSignIn)
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        // A card is a few hundred dp the reader is looking straight at, which
-        // is the case the mesh lets keep moving — see its `continuous` note.
-        MeshGradientBackground(
-            palette = cyclingMeshPalette(WelcomeMeshPalettes, running = motion),
-            modifier = Modifier.matchParentSize(),
-            continuous = true,
-            paused = !motion,
-            driftMillis = 6_000,
-            blurRadius = 36.dp,
-            colorFadeMillis = MESH_CYCLE_MILLIS,
-        )
-        Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 18.dp)) {
+        Column(Modifier.weight(1f)) {
             Text(
                 text = stringResource(Res.string.sign_in_youtube_music),
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.W800,
-                color = Color.White,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
             )
-            Spacer(Modifier.height(16.dp))
-            Row(
-                Modifier
-                    .clip(CircleShape)
-                    .background(Color.White)
-                    .padding(start = 16.dp, end = 20.dp, top = 10.dp, bottom = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Image(
-                    painter = painterResource(Res.drawable.ic_google_g),
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    text = stringResource(Res.string.sign_in_with_google),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.W700,
-                    color = Color.Black,
-                )
-            }
+            Text(
+                text = stringResource(Res.string.personalized_recommendations),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
+        Spacer(Modifier.width(12.dp))
+        Button(onClick = onSignIn) { Text(stringResource(Res.string.sign_in)) }
     }
 }
 
@@ -947,7 +673,7 @@ fun MessageState(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = PAGE_GUTTER + 6.dp, vertical = 48.dp),
+            .padding(horizontal = PAGE_GUTTER + 12.dp, vertical = 48.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
@@ -1027,5 +753,94 @@ fun PillTextField(
             keyboardActions = keyboardActions,
             modifier = Modifier.fillMaxWidth(),
         )
+    }
+}
+
+/** How far a row's [RowMoreButton] reaches past the content edge into the gutter. */
+val ROW_MORE_OUTSET = 14.dp
+
+/**
+ * Lays a trailing control out [outset] narrower than it draws, so it overhangs
+ * its row's end edge by that much: for buttons whose glyph is far smaller than
+ * their touch target, which would otherwise sit visibly inset from the edge.
+ */
+fun Modifier.hangIntoGutter(outset: Dp): Modifier = layout { measurable, constraints ->
+    val placeable = measurable.measure(constraints)
+    val width = (placeable.width - outset.roundToPx()).coerceAtLeast(0)
+    layout(width, placeable.height) { placeable.place(0, 0) }
+}
+
+/**
+ * The ⋮ at the end of a row.
+ */
+@Composable
+fun RowMoreButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    tint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    iconSize: Dp = 20.dp,
+) {
+    Box(
+        modifier = modifier
+            .hangIntoGutter(ROW_MORE_OUTSET)
+            .size(36.dp)
+            .clip(CircleShape)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            Icons.Rounded.MoreVert,
+            contentDescription = stringResource(Res.string.more),
+            tint = tint,
+            modifier = Modifier.size(iconSize),
+        )
+    }
+}
+
+/** The accent a current song's title takes in lists that mark it with [SearchPlayingBars]. */
+val PlayingAccent = Color(0xFFFB4A62)
+
+@Composable
+fun SearchPlayingBars(modifier: Modifier = Modifier) {
+    val heights = listOf(0.38f, 0.78f, 0.52f).mapIndexed { index, minimum ->
+        val transition = rememberInfiniteTransition(label = "search playing bar $index")
+        val height by transition.animateFloat(
+            initialValue = minimum,
+            targetValue = 1f - (index * 0.12f),
+            animationSpec = infiniteRepeatable(
+                animation = keyframes {
+                    durationMillis = 520 + index * 130
+                    minimum at 0
+                    1f at (260 + index * 50)
+                    minimum at durationMillis
+                },
+                repeatMode = RepeatMode.Reverse,
+            ),
+            label = "search bar height $index",
+        )
+        height
+    }
+    Box(
+        modifier = modifier
+            .size(24.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .background(Color.Black.copy(alpha = 0.52f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Row(
+            modifier = Modifier.height(14.dp),
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+            verticalAlignment = Alignment.Bottom,
+        ) {
+            heights.forEach { height ->
+                Box(
+                    Modifier
+                        .width(3.dp)
+                        .height(14.dp * height)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(Color.White),
+                )
+            }
+        }
     }
 }

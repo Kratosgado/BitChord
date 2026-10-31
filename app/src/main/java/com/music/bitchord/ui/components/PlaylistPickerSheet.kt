@@ -1,24 +1,18 @@
 package com.music.bitchord.ui.components
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -28,30 +22,26 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import com.music.bitchord.ui.icons.SfIcons
-import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Public
+import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.RadioButtonUnchecked
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.ModalBottomSheetProperties
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -60,7 +50,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalFocusManager
@@ -77,7 +66,19 @@ import com.music.bitchord.data.model.artworkAt
 import com.music.bitchord.ui.components.thumbnailBorder
 import com.music.bitchord.ui.icons.BitChordIcons
 import java.util.Locale
-import kotlinx.coroutines.launch
+
+/**
+ * What the picker is currently adding to a playlist: a single track, or a
+ * whole release (an album or a user playlist).
+ *
+ * A sealed shape rather than two nullable parameters, so the head of the sheet
+ * and the header the row is described with can never disagree about which of
+ * the two it is drawing.
+ */
+sealed interface PickerTarget {
+    data class Track(val song: Song) : PickerTarget
+    data class Release(val target: BrowseTarget) : PickerTarget
+}
 
 /**
  * Where a track goes: one of the account's playlists, or a new one.
@@ -86,206 +87,157 @@ import kotlinx.coroutines.launch
  * playlist here is nearly always in service of adding the track that opened
  * this — so the form comes back to the same place, and the create request
  * carries the track with it instead of leaving a new empty playlist behind
- * for the user to add to a second time. The sheet is full height from the
- * start, so swapping panels never moves the window.
+ * for the user to add to a second time.
  *
- * [song] is null when the flow started from the Library tab rather than from a
- * track, which is the one case where the header has no track to draw and
- * "New playlist" is the whole point of the sheet.
+ * [target] is null when the flow started from the Library tab rather than
+ * from a track or release, which is the one case where the header has
+ * nothing to draw and "New playlist" is the whole point of the sheet.
  *
- * Playlists are ticked rather than picked: one track often belongs in more
- * than one list, and a sheet that closed on the first tap meant opening it
- * again for each. [onAdd] gets every ticked playlist at once.
- *
- * [offline] is the same sheet over the device's own playlists, for a track
- * that is a file on it: nothing is saved to the account, so the new-playlist
- * form says where it goes instead and has no visibility to pick.
+ * [containingPlaylistIds] is the set of playlist ids that already hold the
+ * target — a track that has already been added to one of the account's
+ * playlists is drawn with a check, so the sheet can act as the answer to
+ * "which of these is it on" as much as the way to add it to another. For a
+ * release target it is the playlists that already hold every track of the
+ * release; the picker doesn't attempt a "some tracks are on it" state,
+ * which reads as neither yes nor no.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PlaylistPickerSheet(
     playlists: List<UserPlaylist>,
     loading: Boolean,
     onAdd: (List<UserPlaylist>) -> Unit,
     onCreate: (String, PlaylistPrivacy) -> Unit,
-    onDismiss: () -> Unit,
-    song: Song? = null,
+    modifier: Modifier = Modifier,
+    target: PickerTarget? = null,
+    containingPlaylistIds: Set<String> = emptySet(),
     startCreating: Boolean = false,
-    offline: Boolean = false,
 ) {
     var creating by remember { mutableStateOf(startCreating) }
     // By id rather than by value: the list is re-fetched under an open sheet,
     // and a refreshed row must stay ticked.
     var selected by remember { mutableStateOf(emptySet<String>()) }
 
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val scope = rememberCoroutineScope()
-    // Once only: the sheet is still up, and tappable, while it slides away, and
-    // a second tap on the tick would file the track a second time.
-    var closing by remember { mutableStateOf(false) }
-    val closeAfter: (() -> Unit) -> Unit = { action ->
-        if (!closing) {
-            closing = true
-            action()
-            scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
-        }
+    // Pre-tick playlists that already contain the target so the user can see
+    // which lists have it. Runs again if the background membership fetch
+    // completes after the sheet is already open (adds but never removes
+    // user-explicit ticks so a tap mid-load is not silently undone).
+    LaunchedEffect(containingPlaylistIds) {
+        selected = selected + containingPlaylistIds
     }
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        // It reaches the top of the screen, where corners would only cut two
-        // notches out of the status bar's background.
-        shape = RectangleShape,
-        containerColor = MaterialTheme.colorScheme.background,
-        dragHandle = null,
-        contentWindowInsets = { WindowInsets(0, 0, 0, 0) },
-        // Back is this sheet's to carry out, below: left to M3 it closes the whole
-        // sheet from either panel, and takes the ticks with it.
-        properties = ModalBottomSheetProperties(shouldDismissOnBackPress = false),
-    ) {
-        BackHandler {
-            if (creating && !startCreating) creating = false else closeAfter {}
+    if (creating) {
+        NewPlaylistForm(
+            // Nowhere to go back to when the sheet opened straight onto the
+            // form; the sheet's own dismiss is the way out.
+            onBack = if (startCreating) null else ({ creating = false }),
+            onCreate = onCreate,
+            modifier = modifier,
+        )
+        return
+    }
+
+    Column(modifier.fillMaxWidth()) {
+        when (target) {
+            is PickerTarget.Track -> {
+                SheetTrackHeader(target.song)
+                HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outline)
+            }
+            is PickerTarget.Release -> {
+                BrowseSheetHeader(target.target)
+                HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outline)
+            }
+            null -> Unit
         }
+        SheetHeading(
+            stringResource(if (target != null) R.string.add_to_playlist else R.string.your_playlists)
+                .uppercase(Locale.getDefault()),
+        )
 
-        Column(
-            Modifier
-                .fillMaxSize()
-                .statusBarsPadding(),
-        ) {
-            if (creating) {
-                NewPlaylistForm(
-                    // Nowhere to go back to when the sheet opened straight onto
-                    // the form, so that bar closes it instead.
-                    onBack = if (startCreating) null else ({ creating = false }),
-                    onClose = { closeAfter {} },
-                    onCreate = { name, privacy -> closeAfter { onCreate(name, privacy) } },
-                    offline = offline,
+        ActionRow(
+            icon = BitChordIcons.Plus,
+            label = stringResource(R.string.new_playlist),
+            onClick = { creating = true },
+        )
+
+        when {
+            // Only while there is nothing to show: re-fetching under a list
+            // that is already up would replace it with a spinner for no gain.
+            loading && playlists.isEmpty() -> Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(120.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator(
+                    strokeWidth = 2.5.dp,
+                    modifier = Modifier.size(26.dp),
                 )
-            } else {
-                SheetTopBar(
-                    leadingIcon = SfIcons.Close,
-                    leadingDescription = stringResource(R.string.close),
-                    onLeading = { closeAfter {} },
-                    confirmDescription = if (selected.isEmpty()) {
-                        stringResource(R.string.add_to_playlist)
-                    } else {
-                        pluralStringResource(R.plurals.add_to_playlists_count, selected.size, selected.size)
-                    },
-                    confirmEnabled = selected.isNotEmpty(),
-                    onConfirm = { closeAfter { onAdd(playlists.filter { it.playlistId in selected }) } },
+            }
+
+            playlists.isEmpty() -> Text(
+                text = stringResource(R.string.no_playlists_yet),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 22.dp, vertical = 18.dp),
+            )
+
+            else -> {
+                HorizontalDivider(
+                    modifier = Modifier.padding(vertical = 6.dp),
+                    thickness = 0.5.dp,
+                    color = MaterialTheme.colorScheme.outline,
                 )
-                if (song != null) {
-                    SheetTrackHeader(song)
-                    HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outline)
+                // Capped so a long list can't push the sheet past the screen;
+                // it scrolls inside the sheet instead.
+                LazyColumn(Modifier.heightIn(max = 320.dp)) {
+                    items(playlists, key = { it.playlistId }) { playlist ->
+                        val ticked = playlist.playlistId in selected
+                        val alreadyAdded = playlist.playlistId in containingPlaylistIds
+                        PlaylistRow(
+                            playlist = playlist,
+                            selected = ticked,
+                            alreadyAdded = alreadyAdded,
+                            onClick = {
+                                selected = if (ticked) selected - playlist.playlistId else selected + playlist.playlistId
+                            },
+                        )
+                    }
                 }
-                SheetHeading(
-                    stringResource(if (song != null) R.string.add_to_playlist else R.string.your_playlists)
-                        .uppercase(Locale.getDefault()),
-                )
-
-                ActionRow(
-                    icon = BitChordIcons.Plus,
-                    label = stringResource(R.string.new_playlist),
-                    onClick = { creating = true },
-                )
-
-                when {
-                    // Only while there is nothing to show: re-fetching under a
-                    // list that is already up would replace it with a spinner
-                    // for no gain.
-                    loading && playlists.isEmpty() -> Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(120.dp),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        CircularProgressIndicator(
-                            strokeWidth = 2.5.dp,
-                            modifier = Modifier.size(26.dp),
-                        )
-                    }
-
-                    playlists.isEmpty() -> Text(
-                        text = stringResource(R.string.no_playlists_yet),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 22.dp, vertical = 18.dp),
+                // Only playlists the user explicitly ticked that don't already
+                // contain the target; already-there ones are pre-ticked for
+                // visibility but excluded from the actual add call.
+                val newlySelected = playlists.filter {
+                    it.playlistId in selected && it.playlistId !in containingPlaylistIds
+                }
+                Spacer(Modifier.height(12.dp))
+                Button(
+                    onClick = { onAdd(newlySelected) },
+                    enabled = newlySelected.isNotEmpty(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 22.dp),
+                ) {
+                    Text(
+                        if (newlySelected.isEmpty()) {
+                            stringResource(R.string.add_to_playlist)
+                        } else {
+                            pluralStringResource(R.plurals.add_to_playlists_count, newlySelected.size, newlySelected.size)
+                        },
                     )
-
-                    else -> {
-                        HorizontalDivider(
-                            modifier = Modifier.padding(vertical = 6.dp),
-                            thickness = 0.5.dp,
-                            color = MaterialTheme.colorScheme.outline,
-                        )
-                        LazyColumn(
-                            modifier = Modifier.weight(1f),
-                            contentPadding = WindowInsets.navigationBars.asPaddingValues(),
-                        ) {
-                            items(playlists, key = { it.playlistId }) { playlist ->
-                                val ticked = playlist.playlistId in selected
-                                PlaylistRow(
-                                    playlist = playlist,
-                                    selected = ticked,
-                                    onClick = {
-                                        selected = if (ticked) selected - playlist.playlistId else selected + playlist.playlistId
-                                    },
-                                )
-                            }
-                        }
-                    }
                 }
             }
         }
+        Spacer(Modifier.height(24.dp))
     }
 }
 
-/**
- * Way out on the left, tick on the right, and whatever the panel wants to say
- * in between: the sheet's two panels share these, so the tick stays put when
- * one swaps for the other.
- */
 @Composable
-private fun SheetTopBar(
-    leadingIcon: ImageVector,
-    leadingDescription: String,
-    onLeading: () -> Unit,
-    confirmDescription: String,
-    confirmEnabled: Boolean,
-    onConfirm: () -> Unit,
-    title: @Composable RowScope.() -> Unit = { Spacer(Modifier.weight(1f)) },
+private fun PlaylistRow(
+    playlist: UserPlaylist,
+    selected: Boolean,
+    alreadyAdded: Boolean,
+    onClick: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        IconButton(onClick = onLeading) {
-            Icon(
-                leadingIcon,
-                contentDescription = leadingDescription,
-                tint = MaterialTheme.colorScheme.onBackground,
-            )
-        }
-        title()
-        IconButton(onClick = onConfirm, enabled = confirmEnabled) {
-            Icon(
-                SfIcons.Check,
-                contentDescription = confirmDescription,
-                tint = if (confirmEnabled) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-                },
-            )
-        }
-    }
-}
-
-@Composable
-private fun PlaylistRow(playlist: UserPlaylist, selected: Boolean, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -322,10 +274,17 @@ private fun PlaylistRow(playlist: UserPlaylist, selected: Boolean, onClick: () -
             }
         }
         Spacer(Modifier.width(12.dp))
+        // Muted tint when the track is already in this playlist so the user
+        // can distinguish "already here" from "just ticked".
+        val checkTint = when {
+            selected && alreadyAdded -> MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
+            selected -> MaterialTheme.colorScheme.primary
+            else -> MaterialTheme.colorScheme.onSurfaceVariant
+        }
         Icon(
             imageVector = if (selected) Icons.Rounded.CheckCircle else Icons.Rounded.RadioButtonUnchecked,
             contentDescription = null,
-            tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            tint = checkTint,
             modifier = Modifier.size(24.dp),
         )
     }
@@ -338,9 +297,8 @@ private fun PlaylistRow(playlist: UserPlaylist, selected: Boolean, onClick: () -
 @Composable
 private fun NewPlaylistForm(
     onBack: (() -> Unit)?,
-    onClose: () -> Unit,
     onCreate: (String, PlaylistPrivacy) -> Unit,
-    offline: Boolean,
+    modifier: Modifier = Modifier,
 ) {
     var name by remember { mutableStateOf("") }
     var privacy by remember { mutableStateOf(PlaylistPrivacy.PRIVATE) }
@@ -358,34 +316,41 @@ private fun NewPlaylistForm(
         }
     }
 
-    Column(Modifier.fillMaxWidth()) {
-        SheetTopBar(
-            leadingIcon = if (onBack != null) SfIcons.ArrowBack else SfIcons.Close,
-            leadingDescription = stringResource(if (onBack != null) R.string.back else R.string.close),
-            onLeading = {
-                focusManager.clearFocus()
-                (onBack ?: onClose)()
-            },
-            confirmDescription = stringResource(R.string.create_playlist),
-            confirmEnabled = name.isNotBlank(),
-            onConfirm = submit,
-            title = {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        text = stringResource(R.string.new_playlist),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onBackground,
-                    )
-                    Text(
-                        text = stringResource(
-                            if (offline) R.string.saved_on_this_device else R.string.saved_to_youtube_music_account,
-                        ),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    // As above: the keyboard is up from the moment this opens, and "Create
+    // playlist" is below the fold without this.
+    Column(
+        modifier
+            .fillMaxWidth()
+            .imePadding(),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = if (onBack != null) 8.dp else 22.dp, end = 22.dp, bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            onBack?.let {
+                IconButton(onClick = it) {
+                    Icon(
+                        Icons.AutoMirrored.Rounded.ArrowBack,
+                        contentDescription = stringResource(R.string.back),
+                        tint = MaterialTheme.colorScheme.onBackground,
                     )
                 }
-            },
-        )
+            }
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.new_playlist),
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onBackground,
+                )
+                Text(
+                    text = stringResource(R.string.saved_to_youtube_music_account),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
         HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outline)
 
         Row(
@@ -437,33 +402,40 @@ private fun NewPlaylistForm(
             }
         }
 
-        // A playlist on the device is seen by whoever holds the device.
-        if (!offline) {
-            SheetHeading(stringResource(R.string.who_can_see_it).uppercase(Locale.getDefault()))
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 22.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                PlaylistPrivacy.entries.forEach { option ->
-                    PrivacyPill(
-                        icon = option.icon,
-                        label = option.label,
-                        selected = option == privacy,
-                        onClick = { privacy = option },
-                    )
-                }
+        SheetHeading(stringResource(R.string.who_can_see_it).uppercase(Locale.getDefault()))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 22.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            PlaylistPrivacy.entries.forEach { option ->
+                PrivacyPill(
+                    icon = option.icon,
+                    label = option.label,
+                    selected = option == privacy,
+                    onClick = { privacy = option },
+                )
             }
         }
 
+        Spacer(Modifier.height(20.dp))
+        Button(
+            onClick = submit,
+            enabled = name.isNotBlank(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 22.dp),
+        ) {
+            Text(stringResource(R.string.create_playlist))
+        }
+        Spacer(Modifier.height(28.dp))
     }
 }
 
 /**
- * Renaming one of the account's playlists: what [BrowseActionsMenu]'s Rename
- * hands on to, raised by the host as a sheet of its own — a text field and its
- * keyboard have no place on a floating menu. Same reason the create form lives
+ * The rename panel of [BrowseActionsSheet], which swaps itself out for this
+ * rather than opening a dialog over itself — same reason the create form lives
  * inside [PlaylistPickerSheet].
  */
 @Composable
@@ -501,7 +473,7 @@ internal fun RenamePlaylistForm(
         ) {
             IconButton(onClick = onBack) {
                 Icon(
-                    SfIcons.ArrowBack,
+                    Icons.AutoMirrored.Rounded.ArrowBack,
                     contentDescription = stringResource(R.string.back),
                     tint = MaterialTheme.colorScheme.onBackground,
                 )

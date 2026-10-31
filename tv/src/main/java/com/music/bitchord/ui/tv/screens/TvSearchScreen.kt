@@ -118,7 +118,7 @@ fun TvSearchScreen(
                     BrowseType.ALBUM -> EntityType.ALBUM
                     BrowseType.ARTIST -> EntityType.ARTIST
                     BrowseType.PLAYLIST -> EntityType.PLAYLIST
-                    BrowseType.OTHER -> EntityType.OTHER
+                    else -> EntityType.TRACK
                 },
             ),
         )

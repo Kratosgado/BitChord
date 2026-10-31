@@ -36,14 +36,12 @@ function nowPlaying(): DiscordNowPlaying | null {
   };
 }
 
-export function startPublisher(): () => void {
+function startPublisher(): () => void {
   /** What was last sent: a track (and the moment it was pushed for), or a clear. */
   let sent: string | null = null;
   let timer: ReturnType<typeof setTimeout> | undefined;
-  /** A push asked to be fresh (a seek, a resume) and not yet sent: a seek buffers before it plays again. */
-  let forced = false;
 
-  const publish = () => {
+  const publish = (force = false) => {
     const { status } = usePlayer.getState();
     const options = useDiscordOptions.getState().options;
     const bridge = getBridge();
@@ -58,17 +56,14 @@ export function startPublisher(): () => void {
     const track = nowPlaying();
     if (!track) return;
     const key = `${track.videoId}|${JSON.stringify(options)}`;
-    if (!forced && sent === key) return;
-    forced = false;
+    if (!force && sent === key) return;
     sent = key;
     void bridge.call('discord.presence', { track, options }, { timeoutMs: 30_000 }).catch(() => (sent = null));
   };
-  // Status flips in bursts (loading → buffering → playing); answer the last one,
-  // keeping any forced push from earlier in the burst.
+  // Status flips in bursts (loading → buffering → playing); answer the last one.
   const soon = (force = false) => {
-    if (force) forced = true;
     clearTimeout(timer);
-    timer = setTimeout(publish, 400);
+    timer = setTimeout(() => publish(force), 400);
   };
 
   let audio: HTMLMediaElement | null = null;
@@ -81,8 +76,7 @@ export function startPublisher(): () => void {
   bindAudio();
 
   const offPlayer = usePlayer.subscribe((state, before) => {
-    // The decks are made on the first play, and a crossfade swaps them: follow the element, not the counter.
-    if (getAudio() !== audio) bindAudio();
+    if (state.deck !== before.deck) bindAudio();
     if (state.nowPlaying?.videoId !== before.nowPlaying?.videoId || state.status !== before.status) {
       // Resuming after a pause is a fresh push: the old timestamps are stale.
       soon(before.status === 'paused' && state.status === 'playing');
