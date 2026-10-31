@@ -179,6 +179,7 @@
     <string name="italian">Italiano</string>
     <string name="turkish">Turco</string>
     <string name="thai">Tailandés</string>
+    <string name="korean">Coreano</string>
     <string name="show_all">Ver todo</string>
     <string name="grid_view">Cuadrícula</string>
     <string name="list_view">Lista</string>
@@ -456,6 +457,8 @@
     <string name="signed_in_as">Sesión iniciada como %1$s</string>
     <string name="signing_in">Iniciando sesión…</string>
     <string name="sleep_timer">Temporizador</string>
+    <string name="sleep_timer_custom">Personalizado</string>
+    <string name="start_sleep_timer">Iniciar temporizador</string>
     <string name="sources_no_lossless">Ninguna fuente activa ofrece audio sin pérdida. Agrega un módulo personalizado para reproducir archivos sin pérdida disponibles sin transcodificarlos.</string>
     <string name="sources_order_footer">Si una fuente no tiene una canción o no responde, BitChord prueba la siguiente. Las fuentes situadas antes de YouTube pueden reemplazar su grabación si devuelven una versión mejor.</string>
     <string name="sources_order_header">Fuentes, en orden de prioridad</string>
@@ -467,7 +470,7 @@
     <string name="source_matching">Coincidencia de fuentes</string>
     <string name="upgrade_length_slack">Tolerancia de duración</string>
     <string name="upgrade_length_slack_subtitle">Diferencia máxima de duración permitida para un stream de reemplazo</string>
-    <string name="upgrade_length_slack_footer">Una tolerancia mayor acepta más coincidencias de fuentes; una menor es más estricta. El valor predeterminado es 3 segundos.</string>
+    <string name="upgrade_length_slack_footer">Una tolerancia mayor acepta más coincidencias de fuentes; una menor es más estricta. El valor predeterminado es 5 segundos.</string>
     <string name="seconds_short">%1$d s</string>
     <string name="spdc_token">Token sp_dc</string>
     <string name="spotify_canvas_setup">Configuración de Spotify Canvas</string>
@@ -810,6 +813,12 @@
     <string name="dolby_atmos_unavailable">Este dispositivo no admite Atmos, por lo que las canciones se reproducirán en su versión habitual</string>
 
     <string name="export_compatible_downloads">Exportar descargas compatibles</string>
+    <string name="sync_downloaded_playlists">Mantener playlists actualizadas</string>
+    <string name="sync_downloaded_playlists_subtitle">Comprueba dos veces al día y descarga las canciones nuevas de tus playlists descargadas</string>
+    <string name="playlist_sync_ask_title">Canciones nuevas en %1$s: %2$d</string>
+    <string name="playlist_sync_ask_text">Toca para descargar</string>
+    <string name="playlist_sync_done_title">Añadidas a %1$s: %2$d</string>
+    <string name="playlist_updates_channel">Actualizaciones de playlists</string>
 
     <string name="legacy_mesh_gradient">Gradiente de malla clásico</string>
 
@@ -1007,9 +1016,7 @@
 
     <string name="settings_search_empty">No settings match “%1$s”</string>
 
-    <string name="prefer_music_only">Prefer music-only version</string>
 
-    <string name="prefer_music_only_subtitle">For music videos, show the video details while finding and loading the catalogue audio version</string>
     <string name="smart_version_alignment">Alineación de audio inteligente</string>
     <string name="smart_version_alignment_subtitle">Analiza las formas de onda para encontrar el momento exacto de reproducción correspondiente</string>
 
@@ -1206,53 +1213,33 @@
         <item quantity="one">Added to %1$d playlist</item>
         <item quantity="other">Added to %1$d playlists</item>
     </plurals>
-    <string name="search_source_addons">Addons</string>
         
-    <string name="search_addons_none">No addons are enabled. Add one in Settings → Sources.</string>
         
-    <string name="spotify">Spotify</string>
         
-    <string name="spotify_connect_subtitle">Sign in to load your playlists. Playback uses YouTube Music.</string>
         
-    <string name="spotify_sign_in">Sign in with Spotify</string>
         
-    <string name="spotify_use_spdc_token">Use sp_dc token</string>
         
-    <string name="spotify_disconnect">Disconnect</string>
         
-    <string name="spotify_empty_playlists">No playlists on this account</string>
         
-    <string name="spotify_empty_tracks">This playlist has no tracks</string>
         
-    <string name="spotify_track_unavailable">Couldn\'t find that song on YouTube Music</string>
         
     <string name="chinese_simplified">Chinese (Simplified)</string>
         
     <string name="chinese_traditional">Chinese (Traditional)</string>
         
-    <string name="app_icon">App icon</string>
         
-    <string name="app_icon_default">Default</string>
         
-    <string name="artist_signatures">Artist signatures</string>
         
-    <string name="artist_signatures_subtitle">Shows a handwritten signature when Apple Music has no title logo</string>
         
-    <string name="artist_signatures_url">Signature API URL</string>
         
-    <string name="artist_signatures_url_hint">https://signatures.example.com</string>
         
-    <string name="artist_signatures_unconfigured">Not configured — tap to set the API URL</string>
         
-    <string name="artist_signatures_test_failed">Could not reach the API at that URL</string>
         
     <string name="hide_status_bar_in_player">Hide status bar in player</string>
         
     <string name="hide_status_bar_in_player_subtitle">Hides the clock, battery and notification icons while the main player is open</string>
         
-    <string name="show_queue_history">Show queue history</string>
         
-    <string name="show_queue_history_subtitle">Show up to 25 previously played songs above Now playing in the queue</string>
         
     <string name="cast_dialog_title">Cast</string>
         
@@ -1272,11 +1259,8 @@
         
     <string name="cast_connect_failed">Couldn\'t connect to the receiver</string>
         
-    <string name="recent_album">Recent Album</string>
         
-    <string name="recent_single">Recent Single</string>
         
-    <string name="recent_ep">Recent EP</string>
         
     <string name="reorder_songs">Reorder songs</string>
         
@@ -1294,186 +1278,284 @@
         
     <string name="lyrics_share_story_revert">Back to the card</string>
         
-    <string name="not_enough_this_week">Play a few more songs this week to unlock your Replay.</string>
         
-    <string name="replay_artist_start_week">This week, </string>
         
     <plurals name="replay_minutes_unit">
             <item quantity="one">%1$s minute</item>
             <item quantity="other">%1$s minutes</item>
         </plurals>
         
-    <string name="replay_songs_end_week"> filled your week.</string>
         
-    <string name="replay_summary_end_week">week</string>
         
         
     <string name="advanced_automix">Advanced Automix</string>
         
     <string name="advanced_automix_subtitle">Mixes like a DJ: keeps the beats locked, makes each move on the beat, and cuts between songs that won\'t blend. No extra processing.</string>
         
-    <string name="replay_this_week">This week</string>
         
     <string name="loudness_off_on_speaker">Disable on Phone Speaker</string>
     
         
-    <string name="source_needs_lossless_output">Needs a lossless output · use a lossless supported device</string>
         
-    <string name="source_needs_lossless_bt_codec">Needs a lossless output · Bluetooth is on %1$s; use a lossless supported device</string>
         
-    <string name="source_needs_lossless_bt_unknown">Needs a lossless output · can’t tell which Bluetooth codec is in use</string>
         
-    <string name="source_downloads_off">Streaming only</string>
         
-    <string name="lossless_output_permission">Check Bluetooth codec</string>
         
-    <string name="lossless_output_permission_denied">Nearby devices permission is off</string>
         
-    <string name="lossless_output_permission_denied_detail">Tap to open Settings and allow Nearby devices — without it we can’t read your Bluetooth codec</string>
         
-    <string name="lossless_output_permission_detail">Allow Nearby devices so LDAC, LHDC or Samsung UHQ headphones can unlock lossless-only addons</string>
         
-    <string name="cached_songs">Cached songs</string>
         
-    <string name="cached_songs_subtitle">Songs from YouTube and JioSaavn in the song cache</string>
         
-    <string name="cached_songs_empty">No cached songs yet. Songs you play from YouTube or JioSaavn will show up here.</string>
         
-    <string name="show_cache_folder">Show cached songs folder</string>
         
-    <string name="show_cache_folder_subtitle">Adds a Cached songs folder to Library with the YouTube and JioSaavn songs kept in the song cache</string>
         
-    <string name="song_cache_unlimited">Unlimited</string>
         
-    <string name="song_cache_unlimited_subtitle">No limit. Cached audio can keep growing until your storage is full.</string>
         
-    <string name="clear_song_cache_title">Clear song cache?</string>
         
-    <string name="clear_song_cache_warning">All cached songs will be deleted and the Cached songs folder will be emptied. They will stream again the next time you play them.</string>
         
-    <string name="import_spotify">Import Spotify</string>
         
-    <string name="import_spotify_subtitle">From a playlist link</string>
         
-    <string name="spotify_import_title">Import Spotify playlist</string>
         
-    <string name="spotify_import_description">Paste a public playlist link. Songs are matched on YouTube Music.</string>
         
-    <string name="spotify_import_description_local">Paste a public playlist link. Songs are matched on YouTube Music and saved on this device.</string>
         
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+    <string name="source_needs_lossless_output">Necesita una salida sin pérdida · usa un dispositivo compatible con audio sin pérdida</string>
+    <string name="source_needs_lossless_bt_codec">Necesita una salida sin pérdida · el Bluetooth usa %1$s; usa un dispositivo compatible con audio sin pérdida</string>
+    <string name="source_needs_lossless_bt_unknown">Necesita una salida sin pérdida · no se puede saber qué códec Bluetooth se usa</string>
+    <string name="source_downloads_on">Descargas permitidas</string>
+    <string name="source_downloads_off">Solo streaming</string>
+    <string name="lossless_output_permission">Comprobar códec Bluetooth</string>
+    <string name="lossless_output_permission_detail">Permite Dispositivos cercanos para que los auriculares LDAC o LHDC desbloqueen los complementos sin pérdida</string>
+    <string name="cached_songs">Canciones en caché</string>
+    <string name="cached_songs_subtitle">Canciones de YouTube y JioSaavn en la caché de canciones</string>
+    <string name="cached_songs_empty">Aún no hay canciones en caché. Las canciones que reproduzcas desde YouTube o JioSaavn aparecerán aquí.</string>
+    <string name="cached_song_partial">Parcial</string>
+    <string name="remove_from_cache">Quitar de la caché</string>
+    <string name="cached_song_remove">Quitar</string>
+    <string name="removed_from_cache">Quitada de la caché de canciones</string>
+    <string name="show_cache_folder">Mostrar carpeta de canciones en caché</string>
+    <string name="show_cache_folder_subtitle">Añade a la Biblioteca una carpeta con las canciones de YouTube y JioSaavn guardadas en la caché</string>
+    <string name="song_cache_unlimited">Ilimitado</string>
+    <string name="song_cache_unlimited_subtitle">Sin límite. El audio en caché puede crecer hasta llenar tu almacenamiento.</string>
+    <string name="clear_song_cache_title">¿Borrar caché de canciones?</string>
+    <string name="clear_song_cache_warning">Se eliminarán todas las canciones en caché y la carpeta de canciones en caché quedará vacía. Se volverán a transmitir la próxima vez que las reproduzcas.</string>
+    <string name="import_spotify">Importar de Spotify</string>
+    <string name="import_spotify_subtitle">Desde un enlace de playlist</string>
+    <string name="local_playlist_subtitle">%1$d canciones · En este dispositivo</string>
+    <string name="lossless_output_permission_denied">El permiso de dispositivos cercanos está desactivado</string>
+    <string name="lossless_output_permission_denied_detail">Toca para abrir Ajustes y permitir dispositivos cercanos; sin él no podemos leer tu códec Bluetooth</string>
+    <string name="recent_album">Álbum reciente</string>
+    <string name="recent_ep">EP reciente</string>
+    <string name="recent_single">Sencillo reciente</string>
+    <string name="spotify">Spotify</string>
+    <string name="spotify_connect_subtitle">Inicia sesión para cargar tus playlists. La reproducción usa YouTube Music.</string>
+    <string name="spotify_disconnect">Desconectar</string>
+    <string name="spotify_empty_playlists">No hay playlists en esta cuenta</string>
+    <string name="spotify_empty_tracks">Esta playlist no tiene canciones</string>
+    <string name="spotify_import_button">Importar</string>
+    <string name="spotify_import_description">Pega un enlace público de playlist. Las canciones se buscan en YouTube Music.</string>
+    <string name="spotify_import_description_local">Pega un enlace público de playlist. Las canciones se buscan en YouTube Music y se guardan en este dispositivo.</string>
+    <string name="spotify_import_done">Se importó «%1$s»</string>
+    <string name="spotify_import_empty_playlist">No hay canciones en esta playlist</string>
+    <string name="spotify_import_failed">No se pudo importar la playlist: %1$s</string>
+    <string name="spotify_import_fetching">Leyendo la playlist de Spotify…</string>
     <string name="spotify_import_hint">open.spotify.com/playlist/…</string>
-        
-    <string name="spotify_import_invalid">That isn\'t a Spotify playlist link.</string>
-        
-    <string name="spotify_import_fetching">Reading the Spotify playlist…</string>
-        
-    <string name="spotify_import_matching">Matching songs %1$d of %2$d</string>
-        
-    <string name="spotify_import_none">None of those songs were found on YouTube Music.</string>
-        
-    <string name="spotify_import_failed">Couldn\'t import the playlist: %1$s</string>
-        
-    <string name="spotify_import_button">Import</string>
-        
-    <string name="spotify_import_local_fallback">Couldn\'t create it on YouTube Music, so \'%1$s\' was saved on this device instead.</string>
-        
-    <string name="spotify_import_done">Imported \'%1$s\'</string>
-        
-    <string name="spotify_import_unmatched">%1$d songs weren\'t found on YouTube Music</string>
-        
-    <string name="local_playlist_subtitle">%1$d songs · On this device</string>
-        
-    <string name="spotify_import_empty_playlist">No songs in this playlist</string>
-        
-    <string name="spotify_library_subtitle">Your Spotify playlists</string>
-        
-    <string name="onboarding_title">Millions of songs, stream on BitChord</string>
-        
-    <string name="onboarding_name_prompt">What should we call you?</string>
-        
-    <string name="onboarding_name_hint">Your name</string>
-        
-    <string name="onboarding_name_footer">Friends see this when you Listen Together. You can change it later in Settings.</string>
-        
-    <string name="onboarding_next">Next</string>
-        
-    <string name="onboarding_connect_title">Connect your YouTube account</string>
-        
-    <string name="onboarding_connect_body">Bring your library, playlists and mixes with you, and start a Listen Together party with friends.</string>
-        
-    <string name="onboarding_sign_in_google">Sign in with Google</string>
-        
-    <string name="onboarding_skip_sign_in">Skip sign in</string>
-        
-    <string name="onboarding_back">Back</string>
-        
-        
-    <string name="wear_os_section">BitChord for Wear OS</string>
-        
+    <string name="spotify_import_invalid">Ese no es un enlace de playlist de Spotify.</string>
+    <string name="spotify_import_local_fallback">No se pudo crear en YouTube Music, así que «%1$s» se guardó en este dispositivo.</string>
+    <string name="spotify_import_matching">Buscando canciones %1$d de %2$d</string>
+    <string name="spotify_import_none">No se encontró ninguna de esas canciones en YouTube Music.</string>
+    <string name="spotify_import_title">Importar playlist de Spotify</string>
+    <string name="spotify_import_unmatched">%1$d canciones no se encontraron en YouTube Music</string>
+    <string name="spotify_library_subtitle">Tus playlists de Spotify</string>
+    <string name="spotify_sign_in">Iniciar sesión con Spotify</string>
+    <string name="spotify_use_spdc_token">Usar token sp_dc</string>
+    <string name="spotify_track_unavailable">No se encontró esa canción en YouTube Music</string>
+    <string name="artist_signatures">Firmas de artistas</string>
+    <string name="artist_signatures_subtitle">Muestra una firma manuscrita cuando Apple Music no tiene logotipo de título</string>
+    <string name="artist_signatures_url">URL de la API de firmas</string>
+    <string name="artist_signatures_url_hint">https://signatures.example.com</string>
+    <string name="artist_signatures_unconfigured">Sin configurar — toca para establecer la URL de la API</string>
+    <string name="artist_signatures_test_failed">No se pudo contactar con la API en esa URL</string>
+    <string name="search_source_addons">Addons</string>
+    <string name="search_addons_none">No hay addons activados. Añade uno en Ajustes → Fuentes.</string>
+    <string name="app_icon">Icono de la app</string>
+    <string name="app_icon_default">Predeterminado</string>
+    <string name="show_queue_history">Mostrar historial de la cola</string>
+    <string name="show_queue_history_subtitle">Muestra hasta 25 canciones reproducidas antes de «Reproduciendo ahora» en la cola</string>
+    <string name="not_enough_this_week">Escucha unas cuantas canciones más esta semana para desbloquear tu Replay.</string>
+    <string name="replay_artist_start_week">Toda la semana, </string>
+    <string name="replay_songs_end_week"> llenaron tu semana.</string>
+    <string name="replay_summary_end_week">semana</string>
+    <string name="replay_this_week">Esta semana</string>
+    <string name="replay_period_weekly">Semanal</string>
+    <string name="replay_period_monthly">Mensual</string>
+    <string name="replay_period_yearly">Anual</string>
+    <string name="replay_period_lifetime">De siempre</string>
+    <string name="onboarding_title">Millones de canciones, en streaming en BitChord</string>
+    <string name="onboarding_name_prompt">¿Cómo quieres que te llamemos?</string>
+    <string name="onboarding_name_hint">Tu nombre</string>
+    <string name="onboarding_name_footer">Tus amigos lo ven cuando usas Escuchar juntos. Puedes cambiarlo más tarde en Ajustes.</string>
+    <string name="onboarding_next">Siguiente</string>
+    <string name="onboarding_connect_title">Conecta tu cuenta de YouTube</string>
+    <string name="onboarding_connect_body">Trae contigo tu biblioteca, listas y mixes, y empieza una sesión de Escuchar juntos con tus amigos.</string>
+    <string name="onboarding_sign_in_google">Iniciar sesión con Google</string>
+    <string name="onboarding_skip_sign_in">Omitir inicio de sesión</string>
+    <string name="onboarding_back">Atrás</string>
+    <string name="wear_os_section">BitChord para Wear OS</string>
     <string name="wear_os_page_title">Wear OS</string>
-        
-    <string name="wear_os_your_watches">Your watches</string>
-        
-    <string name="wear_os_value_none">No watch</string>
-        
-    <string name="wear_os_value_not_installed">Not installed</string>
-        
-    <string name="wear_os_value_up_to_date">Up to date</string>
-        
-    <string name="wear_os_looking">Looking for watches…</string>
-        
-    <string name="wear_os_no_watch">No watch connected</string>
-        
-    <string name="wear_os_no_watch_subtitle">Pair a Wear OS watch with this phone in its companion app first.</string>
-        
-    <string name="wear_os_checking">Checking…</string>
-        
-    <string name="wear_os_not_installed">BitChord isn’t on this watch</string>
-        
-    <string name="wear_os_up_to_date">Up to date · %1$s</string>
-        
-    <string name="wear_os_update_available">Update available</string>
-        
-    <string name="wear_os_unknown">Installed · couldn’t check the version</string>
-        
-    <string name="wear_os_sending">Sending to your watch…</string>
-        
-    <string name="wear_os_sent">Sent — finish on your watch if it asks</string>
-        
-    <string name="wear_os_send_failed">Couldn’t send the update (%1$s)</string>
-        
-    <string name="wear_os_install">Install</string>
-        
-    <string name="wear_os_update">Update</string>
-        
-    <string name="wear_os_install_title">Install on your watch</string>
-        
-    <string name="wear_os_step_wifi">Connect your watch to the same Wi-Fi as this phone.</string>
-        
-    <string name="wear_os_step_developer">Turn on Developer options on the watch. Galaxy Watch: Settings → About watch → Software information → tap Software version five times. Pixel Watch: Settings → System → About → tap Build number seven times.</string>
-        
-    <string name="wear_os_step_debugging">In Developer options, turn on ADB debugging and Wireless debugging.</string>
-        
-    <string name="wear_os_step_pair">Tap Pair new device, then enter the six-digit code the watch shows.</string>
-        
-    <string name="wear_os_searching">Looking for your watch on Wi-Fi…</string>
-        
-    <string name="wear_os_found">Found your watch</string>
-        
-    <string name="wear_os_pairing">Pairing…</string>
-        
-    <string name="wear_os_installing">Installing BitChord on your watch…</string>
-        
-    <string name="wear_os_installed">Installed. You can turn Wireless debugging off again.</string>
-        
-    <string name="wear_os_failed">That didn’t work (%1$s). Check the code and try again.</string>
-        
-    <string name="wear_os_unsupported">Installing on a watch needs Android 11 or later on this phone.</string>
-        
-    <string name="wear_os_code_hint">Pairing code</string>
-        
-    <string name="wear_os_done">Done</string>
-        
-    <string name="signed_by">Signed by %1$s</string>
-        
+    <string name="wear_os_your_watches">Tus relojes</string>
+    <string name="wear_os_value_none">Sin reloj</string>
+    <string name="wear_os_value_not_installed">No instalado</string>
+    <string name="wear_os_value_up_to_date">Actualizado</string>
+    <string name="wear_os_looking">Buscando relojes…</string>
+    <string name="wear_os_no_watch">Ningún reloj conectado</string>
+    <string name="wear_os_no_watch_subtitle">Primero vincula un reloj Wear OS con este teléfono desde su app complementaria.</string>
+    <string name="wear_os_checking">Comprobando…</string>
+    <string name="wear_os_not_installed">BitChord no está en este reloj</string>
+    <string name="wear_os_up_to_date">Actualizado · %1$s</string>
+    <string name="wear_os_update_available">Actualización disponible</string>
+    <string name="wear_os_unknown">Instalado · no se pudo comprobar la versión</string>
+    <string name="wear_os_sending">Enviando a tu reloj…</string>
+    <string name="wear_os_sent">Enviado: termina en tu reloj si te lo pide</string>
+    <string name="wear_os_send_failed">No se pudo enviar la actualización (%1$s)</string>
+    <string name="wear_os_install">Instalar</string>
+    <string name="wear_os_update">Actualizar</string>
+    <string name="wear_os_install_title">Instalar en tu reloj</string>
+    <string name="wear_os_step_wifi">Conecta tu reloj a la misma red Wi-Fi que este teléfono.</string>
+    <string name="wear_os_step_developer">Activa las opciones de desarrollador en el reloj. Galaxy Watch: Ajustes → Acerca del reloj → Información del software → toca cinco veces Versión del software. Pixel Watch: Ajustes → Sistema → Acerca de → toca siete veces Número de compilación.</string>
+    <string name="wear_os_step_debugging">En las opciones de desarrollador, activa la depuración ADB y la depuración inalámbrica.</string>
+    <string name="wear_os_step_pair">Toca Vincular dispositivo nuevo e introduce el código de seis dígitos que muestra el reloj.</string>
+    <string name="wear_os_searching">Buscando tu reloj en la red Wi-Fi…</string>
+    <string name="wear_os_found">Reloj encontrado</string>
+    <string name="wear_os_pairing">Vinculando…</string>
+    <string name="wear_os_installing">Instalando BitChord en tu reloj…</string>
+    <string name="wear_os_installed">Instalado. Ya puedes desactivar de nuevo la depuración inalámbrica.</string>
+    <string name="wear_os_failed">No ha funcionado (%1$s). Comprueba el código e inténtalo de nuevo.</string>
+    <string name="wear_os_unsupported">Instalar en un reloj requiere Android 11 o posterior en este teléfono.</string>
+    <string name="wear_os_code_hint">Código de vinculación</string>
+    <string name="wear_os_done">Hecho</string>
+    <string name="signed_by">Firmado por %1$s</string>
+    <string name="song_info">Información de la canción</string>
+    <string name="song_info_album">Álbum</string>
+    <string name="song_info_release_date">Fecha de lanzamiento</string>
+    <string name="song_info_views">Reproducciones / visualizaciones</string>
+    <string name="song_info_likes">Me gusta</string>
+    <string name="song_info_comments">Comentarios</string>
+    <string name="song_info_unavailable">No disponible</string>
+    <string name="song_info_error">No se pudo cargar parte de la información.</string>
+    <string name="song_info_retry">Reintentar</string>
+    <string name="no_audio_version">No audio version found for this video</string>
+    <string name="no_video_version">No video version found for this song</string>
+    <string name="version_switch_in_party">Everyone in Listen Together hears the same version</string>
+    <string name="opened_file">Archivo abierto</string>
+    <string name="folders">Carpetas</string>
+    <string name="folder">Carpeta</string>
+    <string name="no_local_folders">No hay carpetas con música</string>
+    <string name="offline_playlist_empty">Esta lista aún está vacía. Añade canciones desde su menú.</string>
+    <string name="offline_liked_empty">Las canciones que te gusten en este dispositivo aparecerán aquí</string>
+    <string name="saved_on_this_device">Guardada en este dispositivo</string>
+    <string name="direct_source_stream_in_party">Desactivado mientras estás en una fiesta de Listen Together</string>
+    <string name="direct_source_stream">Transmisión directa desde la fuente</string>
+    <string name="find_your_mood">Encuentra tu estado de ánimo</string>
+    <string name="progressive_blur">Desenfoque progresivo</string>
+    <string name="remove_from_history">Quitar del historial</string>
+    <string name="remove_from_history_failed">No se pudo quitar del historial</string>
+    <string name="addon_blocked_title">No se puede reproducir esta canción</string>
+    <string name="addon_blocked_quality">La calidad de audio con %1$s está en %2$s. Las canciones de %3$s solo se reproducen en Sin pérdida: cámbiala en Ajustes → Calidad de audio para reproducir esta.</string>
+    <string name="addon_blocked_watch">La música se reproduce a través de tu reloj, que limita el audio por debajo de Sin pérdida. Las canciones de %1$s volverán a sonar cuando tu teléfono recupere la música.</string>
+    <string name="download_addon_left_out_title">Descargando sin %1$s</string>
+    <string name="download_addon_not_allowed">%1$s no permite descargas, así que tus canciones se guardan desde tus otras fuentes.</string>
+    <string name="download_addon_needs_lossless_output">%1$s solo sirve música con auriculares con cable, USB o de clase LDAC conectados. Las descargas lo omiten hasta que conectes unos, así que tus canciones se guardan desde tus otras fuentes.</string>
+    <string name="show_listen_together_button">Mostrar botón de Escuchar juntos</string>
+    <string name="show_listen_together_button_subtitle">Si está desactivado, el reproductor solo muestra el botón de salida de audio entre la letra y la cola</string>
+    <string name="font">Fuente</string>
+    <string name="font_default">Predeterminada</string>
+    <string name="font_legacy">Clásica</string>
+    <string name="font_default_subtitle">SF Pro Display · Pesos de Apple Music</string>
+    <string name="font_legacy_subtitle">SF Pro Display · Pesos gruesos originales</string>
+    <string name="font_footer">Clásica recupera la tipografía más gruesa y compacta que usaba la app antes de adaptarla a Apple Music.</string>
+    <string name="bit_perfect_output">Salida bit-perfect</string>
+    <string name="bit_perfect_bypassed_footer">La salida bit-perfect está lista, por lo que se omiten los ajustes atenuados y no se solicitan versiones Dolby Atmos. Vuelven a funcionar al desconectar el DAC o desactivar el modo.</string>
+    <string name="bit_perfect_sheet_warning">Envía la pista al DAC sin cambios. Se omiten el ecualizador, la normalización de volumen, el fundido cruzado, la mezcla automática, la velocidad de reproducción y el volumen de BitChord.</string>
+    <string name="bit_perfect_mode_off_subtitle">El audio pasa por el mezclador de Android y los efectos de BitChord.</string>
+    <string name="bit_perfect_mode_usb_android">DAC USB</string>
+    <string name="bit_perfect_mode_usb_android_subtitle">Android 14 abre el DAC con la frecuencia y la profundidad de bits de cada pista, sin mezclar ni remuestrear.</string>
+    <string name="bit_perfect_requires_android_14">Requiere Android 14 o posterior</string>
+    <string name="bit_perfect_mode_dap_exclusive">DAC integrado (AAudio exclusivo)</string>
+    <string name="bit_perfect_mode_dap_exclusive_subtitle">Para reproductores de música con DAC propio. Abre la salida de auriculares o de línea en exclusiva con la frecuencia de cada pista. No todos los dispositivos conceden el modo exclusivo.</string>
+    <string name="bit_perfect_requires_android_8_1">Requiere Android 8.1 o posterior</string>
+    <string name="bit_perfect_mode_usb_direct">DAC USB (controlador directo)</string>
+    <string name="bit_perfect_mode_usb_direct_subtitle">BitChord controla el DAC directamente, en cualquier versión de Android, y ajusta el volumen en el DAC. Pide permiso USB. Puede sonar mucho más alto que la salida normal.</string>
+    <string name="dac_volume">Volumen del DAC</string>
+    <string name="dac_volume_subtitle">Se ajusta en el propio DAC; la música no se escala</string>
+    <string name="usb_allow_fixed_volume">Permitir DAC sin control de volumen</string>
+    <string name="usb_allow_fixed_volume_subtitle">Si no, ese DAC reproduce por la salida normal</string>
+    <string name="usb_allow_fixed_volume_confirm_title">¿Reproducir a escala completa?</string>
+    <string name="usb_allow_fixed_volume_confirm_message">BitChord no puede ajustar el volumen de este tipo de DAC, así que reproduce a escala completa y solo su propio mando, si lo tiene, controla el nivel. Puede sonar peligrosamente alto con auriculares sensibles.</string>
+    <string name="convert_for_limited_dac">Convertir para DAC más limitados</string>
+    <string name="convert_for_limited_dac_subtitle">Convierte las pistas que superan el límite de tu DAC a su formato más alto. Pueden tardar más en empezar y no serán bit-perfect respecto al original.</string>
+    <string name="bit_perfect_confirm_title">¿Activar la salida bit-perfect?</string>
+    <string name="bit_perfect_confirm_message">El DAC recibe la música a escala completa y es posible que los botones de volumen del teléfono dejen de funcionar. Baja el volumen del DAC o del amplificador antes de reproducir.</string>
+    <string name="bit_perfect_status_active">%1$s · %2$s kHz · %3$d bits</string>
+    <string name="bit_perfect_status_dac_limited">%1$s · %2$s kHz · %3$d bits · máximo del DAC, convertido desde el formato de esta pista</string>
+    <string name="bit_perfect_status_inexact">%1$s · no exacto: esta fuente no es PCM sin pérdida</string>
+    <string name="bit_perfect_status_waiting">Esperando una pista sin pérdida en una salida compatible</string>
+    <string name="bit_perfect_status_unavailable">No disponible para esta pista (%1$s)</string>
 </resources>

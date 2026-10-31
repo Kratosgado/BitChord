@@ -55,8 +55,9 @@ data class ArtworkPalette(
      * A blur wide enough to lose the picture leaves the mean of what it
      * sampled, so a page that starts from this colour where the artwork stops
      * reads as that blur carrying on rather than as a second surface beginning.
-     * Lighter than [background], which the page still settles into further
-     * down — the artwork's colour is strongest right under the artwork.
+     * Lighter than [background]. An artist page is this colour, flat, all the
+     * way down under its photograph; a release page, whose sleeve sits in a
+     * frame rather than bleeding into the page, is [background] instead.
      */
     val wash: Color,
     /** Fill for the glass buttons and chips that sit on [background]. */
@@ -76,7 +77,9 @@ data class ArtworkPalette(
 data class ArtworkKeyColors(val background: Color, val accent: Color)
 
 /**
- * Pulls [ArtworkPalette] out of the artwork at [imageUrl].
+ * Pulls [ArtworkPalette] out of the artwork at [imageUrl], or out of
+ * [keyColors] when the source already supplied them and there is nothing to
+ * decode.
  *
  * Artwork that has already been read once is tinted on the very first frame,
  * off [seedCache] — a sheet opened from a page it shares a cover with, or a
@@ -102,11 +105,14 @@ fun rememberArtworkPalette(
 ): ArtworkPalette {
     val scheme = MaterialTheme.colorScheme
     val reduceAnimation by PlayerPlatform.host.settings.reduceAnimation.collectAsStateWithLifecycle()
-    val seed = rememberArtworkSeed(imageUrl, artPx)
+    // Always asked, so the composable call is unconditional; handed nothing to
+    // read when the colours are already in hand.
+    val decoded = rememberArtworkSeed(if (keyColors == null) imageUrl else null, artPx)
+    val seed = keyColors?.toSeed() ?: decoded
     // Whether the colours were there from the first frame. If they were, there
     // is nothing to crossfade *from* and animating would only put a delay in
     // front of a surface that could already be right.
-    val knownUpFront = remember(imageUrl) { seed != null }
+    val knownUpFront = remember(imageUrl) { decoded != null }
 
     val target = seed?.toPalette(dark) ?: ArtworkPalette(
         background = scheme.background,
@@ -145,6 +151,47 @@ fun rememberArtworkTopBandLuminance(
     imageUrl: String?,
     artPx: Int = CARD_ART_PX,
 ): Float? = rememberArtworkSeed(imageUrl, artPx)?.topBandLuminance
+
+/**
+ * The pale tint the player sets its secondary text and glyphs in, or null
+ * until the artwork has been read — and for artwork with no colour worth
+ * echoing — so the player keeps its plain white rather than showing a
+ * placeholder grey that reads as the colour having gone wrong.
+ *
+ * Not [ArtworkPalette.onBackgroundVariant], though it is lifted the same way:
+ * that one always starts from the sleeve's most common colour, and on a cover
+ * that is mostly black that colour is a near-black whose hue nobody can see.
+ * HSL still gives it one — a black with a trace of red in it is "pink" at full
+ * saturation — and lifting it pale put a pink on the player that is nowhere
+ * on the cover. So the tint starts from the first colour that is actually
+ * visible: the dominant one if it has real chroma, else the accent.
+ */
+@Composable
+fun rememberPlayerTint(imageUrl: String?, artPx: Int = CARD_ART_PX): Color? {
+    val seed = rememberArtworkSeed(imageUrl, artPx)
+    return remember(seed) { seed?.playerTint() }
+}
+
+private fun Seed.playerTint(): Color? {
+    val source = listOf(dominant, vibrant).firstOrNull { it.chroma() >= TINT_MIN_CHROMA } ?: return null
+    // Much nearer white than an album page's secondary line: the player's
+    // backdrop is the artwork itself, often as bright and as coloured as the
+    // tint, and a tint at the page's 0.80 sank into it. This keeps a hint of
+    // the sleeve while staying a light text colour on any backdrop.
+    return source.withHsl(
+        saturation = { adaptedArtworkSaturation(it, minimum = 0.18f, maximum = PLAYER_TINT_MAX_SATURATION) },
+        lightness = { PLAYER_TINT_LIGHTNESS },
+    )
+}
+
+private const val PLAYER_TINT_LIGHTNESS = 0.88f
+private const val PLAYER_TINT_MAX_SATURATION = 0.40f
+
+/** Spread between the strongest and weakest channel — colour you can see, unlike HSL saturation. */
+private fun Color.chroma(): Float = maxOf(red, green, blue) - minOf(red, green, blue)
+
+/** Below this a swatch is black, white or grey to the eye, whatever hue HSL assigns it. */
+private const val TINT_MIN_CHROMA = 0.08f
 
 @Composable
 private fun rememberArtworkSeed(imageUrl: String?, artPx: Int): Seed? {
@@ -228,6 +275,17 @@ private fun seedOf(bitmap: ImageBitmap): Seed? {
         topBandLuminance = bitmap.topBandRelativeLuminance(),
     )
 }
+
+/**
+ * A seed with every note taken from the supplied colours: the page is the
+ * background from top to edge, and the accent is the supplied one.
+ */
+private fun ArtworkKeyColors.toSeed() = Seed(
+    dominant = background,
+    vibrant = accent,
+    edge = background,
+    topBandLuminance = relativeLuminance(background.toArgb()),
+)
 
 private const val SWATCH_COUNT = 24
 
@@ -332,11 +390,14 @@ private fun Seed.toPalette(dark: Boolean): ArtworkPalette = if (dark) {
             lightness = { it.coerceIn(0.62f, 0.78f) },
         ),
         onBackground = Color.White,
-        // Well above the grey the untinted screens use for secondary text. A
-        // tint is a *coloured* background, not a black one, so the contrast a
-        // dim grey has against black is not the contrast it has here — artist
-        // names were sinking into the wash on mid-toned sleeves.
-        onBackgroundVariant = Color.White.copy(alpha = 0.80f),
+        // A pale tint of the page's own hue rather than a translucent white —
+        // Apple Music's secondary lines are the sleeve's colour, lifted, so a
+        // blue record's credits read light blue on its blue page. Bright
+        // enough that it still clears contrast on [background].
+        onBackgroundVariant = dominant.withHsl(
+            saturation = { adaptedArtworkSaturation(it, minimum = 0.22f, maximum = 0.50f) },
+            lightness = { 0.80f },
+        ),
         divider = Color.White.copy(alpha = 0.12f),
     )
 } else {
@@ -358,7 +419,11 @@ private fun Seed.toPalette(dark: Boolean): ArtworkPalette = if (dark) {
             lightness = { it.coerceIn(0.30f, 0.44f) },
         ),
         onBackground = Color.Black,
-        onBackgroundVariant = Color.Black.copy(alpha = 0.70f),
+        // The same hue taken down rather than up, for the pale page.
+        onBackgroundVariant = dominant.withHsl(
+            saturation = { adaptedArtworkSaturation(it, minimum = 0.22f, maximum = 0.55f) },
+            lightness = { 0.34f },
+        ),
         divider = Color.Black.copy(alpha = 0.10f),
     )
 }
