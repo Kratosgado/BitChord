@@ -20,7 +20,6 @@ import {
   type SpotifyAuthStatus,
 } from '@/extension/useSpotifyAuth';
 import { settingsUi } from './settingsStyles';
-import { Select } from '@/components/Select';
 
 /** Allowed, or an Allow button that opens the extension's permission page. */
 function HostAccessValue({ access, request }: ReturnType<typeof useHostAccess>) {
@@ -198,12 +197,17 @@ export function DiscordSettings() {
           <>
             <label className={settingsUi.controlRow}>
               <span>Activity</span>
-              <Select
-                label="Activity"
+              <select
+                className={settingsUi.select}
                 value={options.activityType}
-                options={ACTIVITY_TYPES}
-                onChange={(activityType) => set({ activityType })}
-              />
+                onChange={(e) => set({ activityType: e.currentTarget.value as DiscordPresenceOptions['activityType'] })}
+              >
+                {ACTIVITY_TYPES.map((t) => (
+                  <option key={t.value} value={t.value}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
             </label>
             <label className={settingsUi.controlRow}>
               <span>Name</span>
@@ -216,7 +220,17 @@ export function DiscordSettings() {
             </label>
             <label className={settingsUi.controlRow}>
               <span>Status</span>
-              <Select label="Status" value={options.status} options={STATUSES} onChange={(status) => set({ status })} />
+              <select
+                className={settingsUi.select}
+                value={options.status}
+                onChange={(e) => set({ status: e.currentTarget.value as DiscordPresenceOptions['status'] })}
+              >
+                {STATUSES.map((s) => (
+                  <option key={s.value} value={s.value}>
+                    {s.label}
+                  </option>
+                ))}
+              </select>
             </label>
             <Toggle
               label="Lead with the song"

@@ -86,9 +86,7 @@ export interface LookupOptions {
 export async function lookupLyrics(track: LyricsTrack, { only, onSource }: LookupOptions = {}): Promise<LyricsResult | null> {
   const sequence = only ? [only] : enabledSources();
   if (!sequence.length) return null;
-  const { paxsenixKey, preferSyllables } = useLyricsSettings.getState();
-  // preferSyllables picks a different winner from the same answers, so it is part of the key.
-  const key = `${track.videoId}|${track.durationMs}|${track.title}|${track.artist}|${only ?? ''}|${sequence.join(',')}|${preferSyllables}`;
+  const key = `${track.videoId}|${track.durationMs}|${track.title}|${track.artist}|${only ?? ''}|${sequence.join(',')}`;
   const cached = cache.get(key);
   if (cached && Date.now() - cached.at < CACHE_TTL_MS) return cached.result;
 
@@ -118,6 +116,7 @@ export async function lookupLyrics(track: LyricsTrack, { only, onSource }: Looku
     }
     return pending;
   };
+  const { paxsenixKey, preferSyllables } = useLyricsSettings.getState();
 
   const fetchFrom = (source: LyricsSourceId): Promise<Parsed | null> => {
     switch (source) {

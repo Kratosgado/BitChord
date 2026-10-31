@@ -29,21 +29,7 @@ export interface LoadedTrack {
   client: PlayerClientName;
   /** The audio format actually selected, e.g. "251 opus 140kbps". */
   format: string;
-  /** The same, field by field, for stats for nerds. */
-  stream: StreamStats;
   loudnessDb: number | null;
-}
-
-/** What stats for nerds shows about the audio stream (the phone's NerdStats.Snapshot). */
-export interface StreamStats {
-  /** "Opus", "AAC". */
-  codec: string | null;
-  itag: string | null;
-  bitrateKbps: number | null;
-  sampleRateHz: number | null;
-  channels: number | null;
-  /** "direct" (googlevideo URLs, by range) or "SABR". */
-  mode: 'direct' | 'SABR';
 }
 
 /** A music video's picture: a video-only DASH manifest over the same response's direct URLs. */
@@ -52,8 +38,6 @@ export interface VideoStream {
   manifest: string;
   /** Width over height of the largest rendition, e.g. 16/9. */
   aspect: number;
-  /** Every height the response offers, largest first: what the quality switcher lists. */
-  heights: number[];
 }
 
 /**
@@ -238,8 +222,7 @@ export class YouTubeEngine {
       player.load(`data:application/dash+xml;base64,${btoa(manifest)}`, startSec, 'application/dash+xml'),
     );
     this.checkCurrent(generation);
-    const selected = this.selectAudio(player);
-    const format = `${selected.label} ${mode}`;
+    const format = `${this.selectAudio(player)} ${mode}`;
     if (direct) this.direct = resolved;
 
     if (autoplay) {
@@ -264,7 +247,6 @@ export class YouTubeEngine {
         .sort((a, b) => b.width - a.width),
       client,
       format,
-      stream: { ...selected.stats, mode },
       loudnessDb: info.player_config?.audio_config?.loudness_db ?? null,
     };
   }
@@ -304,14 +286,8 @@ export class YouTubeEngine {
    * renditions from the same response, as a DASH manifest for a second,
    * muted player. Null for a song (YouTube's square art track), for a track
    * that streams over SABR, and while nothing is loaded.
-   *
-   * [height] keeps only the renditions of that height, which is how a picked
-   * quality is held: Shaka would otherwise drop every codec but the preferred
-   * one (StreamUtils.chooseCodecsAndFilterManifest), and YouTube's H.264
-   * ladder stops at 1080p, so 1440p and 2160p are only reachable with the
-   * manifest cut down to them.
    */
-  async videoStream(height: number | null = null): Promise<VideoStream | null> {
+  async videoStream(): Promise<VideoStream | null> {
     const resolved = this.direct;
     if (!resolved) return null;
     const { videoId, client, info } = resolved;
@@ -320,19 +296,17 @@ export class YouTubeEngine {
     );
     const largest = pictures.sort((a, b) => b.width! * b.height! - a.width! * a.height!)[0];
     if (!largest || largest.width! / largest.height! < MIN_VIDEO_ASPECT) return null;
-    const heights = [...new Set(pictures.map((f) => f.height!))].sort((a, b) => b - a);
-    const wanted = height !== null && heights.includes(height) ? height : null;
     const pot = usesWebPo(client) ? await botguard.mint(videoId) : undefined;
     const manifest = await info.toDash({
       // YouTube.js drops the formats this returns true for.
-      format_filter: (format) => !format.has_video || format.has_audio || (wanted !== null && format.height !== wanted),
+      format_filter: (format) => !format.has_video || format.has_audio,
       url_transformer: (url) => {
         if (pot) url.searchParams.set('pot', pot);
         return url;
       },
       manifest_options: { include_thumbnails: false },
     });
-    return { videoId, manifest, aspect: largest.width! / largest.height!, heights };
+    return { videoId, manifest, aspect: largest.width! / largest.height! };
   }
 
   /** The SABR session: googlevideo's adapter in front of Shaka (Kira, googlevideo's example). */
@@ -391,15 +365,8 @@ export class YouTubeEngine {
   }
 
   /** Picks Opus 251 (else AAC 140): the preferred codec's highest bitrate, avoiding DRC renditions. */
-  private selectAudio(player: shaka.Player): { label: string; stats: Omit<StreamStats, 'mode'> } {
+  private selectAudio(player: shaka.Player): string {
     const tracks = player.getVariantTracks().filter((t) => !/drc/i.test(t.originalAudioId ?? ''));
-    const statsOf = (t: shaka.extern.Track) => ({
-      codec: codecName(t.audioCodec),
-      itag: (t.originalAudioId ?? '').split('-')[0] || null,
-      bitrateKbps: Math.round((t.audioBandwidth ?? t.bandwidth) / 1000) || null,
-      sampleRateHz: t.audioSamplingRate,
-      channels: t.channelsCount,
-    });
     for (const codec of this.preferredCodecs) {
       const best = tracks
         .filter((t) => t.audioCodec?.startsWith(codec))
@@ -407,13 +374,11 @@ export class YouTubeEngine {
       if (best) {
         if (!best.active) player.selectVariantTrack(best, true);
         const itag = (best.originalAudioId ?? '').split('-')[0];
-        return { label: `${itag} ${codec} ${Math.round((best.audioBandwidth ?? best.bandwidth) / 1000)}kbps`, stats: statsOf(best) };
+        return `${itag} ${codec} ${Math.round((best.audioBandwidth ?? best.bandwidth) / 1000)}kbps`;
       }
     }
     const active = player.getVariantTracks().find((t) => t.active);
-    return active
-      ? { label: `${active.originalAudioId} ${active.audioCodec}`, stats: statsOf(active) }
-      : { label: 'unknown', stats: { codec: null, itag: null, bitrateKbps: null, sampleRateHz: null, channels: null } };
+    return active ? `${active.originalAudioId} ${active.audioCodec}` : 'unknown';
   }
 
   /** Resolves once the element has data to play, or rejects after the timeout. */
@@ -472,16 +437,6 @@ export class YouTubeEngine {
     this.adapter?.dispose();
     this.adapter = null;
   }
-}
-
-/** The codec under its usual name rather than its RFC 6381 string (the phone's codecLabel). */
-function codecName(codec: string | null): string | null {
-  if (!codec) return null;
-  if (codec.startsWith('opus')) return 'Opus';
-  if (codec.startsWith('mp4a')) return 'AAC';
-  if (codec.startsWith('ec-3')) return 'E-AC-3';
-  if (codec.startsWith('ac-3')) return 'AC-3';
-  return codec.toUpperCase();
 }
 
 /** Whether the response carries audio URLs to fetch directly (VISIONOS does; the web clients only offer SABR). */

@@ -1,7 +1,5 @@
 package com.music.bitchord.ui.player
 
-import com.music.bitchord.ui.components.trackArtSize
-import androidx.compose.ui.layout.ContentScale
 import com.music.bitchord.sharedui.resources.*
 import com.music.bitchord.ui.components.ExplicitSongTitle
 
@@ -774,9 +772,8 @@ private fun InlineQueueRow(
         AsyncImage(
             model = rememberRemoteArtworkUrl(song),
             contentDescription = null,
-            contentScale = ContentScale.Crop,
             modifier = Modifier
-                .trackArtSize(44.dp, song.isVideo)
+                .size(44.dp)
                 .clip(RoundedCornerShape(6.dp))
                 .thumbnailBorder(RoundedCornerShape(6.dp))
                 .background(Color.White.copy(alpha = 0.08f)),

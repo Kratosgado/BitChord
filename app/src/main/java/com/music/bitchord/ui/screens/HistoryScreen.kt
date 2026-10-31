@@ -17,6 +17,7 @@ import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.model.UiState
 import com.music.bitchord.data.model.playingRowMatcher
 import com.music.bitchord.ui.components.MessageState
+import com.music.bitchord.ui.components.PlayingAccent
 import com.music.bitchord.ui.components.ROW_DIVIDER_INSET
 import com.music.bitchord.ui.components.SongRow
 import com.music.bitchord.ui.components.songListSkeleton
@@ -76,6 +77,7 @@ fun HistoryScreen(
                         isCurrent = isCurrentRow(song),
                         isPlaying = isCurrentRow(song) && isPlaying,
                         searchPlayingStyle = true,
+                        activeTint = PlayingAccent,
                     )
                     if (index < songs.lastIndex) {
                         HorizontalDivider(

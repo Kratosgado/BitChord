@@ -79,21 +79,9 @@ object QueueCoordinator {
             }
         }
 
-        player.removeRuns(userQueueIndices)
-    }
-
-    /**
-     * Removes the ascending [indices] a contiguous run at a time, last run first
-     * so the indices ahead of each removal still hold. Each call makes Media3
-     * publish the whole queue to the system; see [rotateExpiredHistory].
-     */
-    private fun Player.removeRuns(indices: List<Int>) {
-        var end = indices.size
-        while (end > 0) {
-            var start = end - 1
-            while (start > 0 && indices[start - 1] == indices[start] - 1) start--
-            removeMediaItems(indices[start], indices[end - 1] + 1)
-            end = start
+        // Remove in reverse order to preserve preceding indices during removal
+        for (i in userQueueIndices.asReversed()) {
+            player.removeMediaItem(i)
         }
     }
 
@@ -118,7 +106,9 @@ object QueueCoordinator {
             }
         }
 
-        player.removeRuns(playedIndices)
+        for (i in playedIndices.asReversed()) {
+            player.removeMediaItem(i)
+        }
     }
 
     /** @see QueueTimeline.buildJumpQueue */

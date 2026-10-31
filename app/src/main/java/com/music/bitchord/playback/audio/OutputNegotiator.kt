@@ -15,6 +15,7 @@ import com.music.bitchord.data.settings.OutputPcmMode
 import com.music.bitchord.playback.AudioOutputPolicy
 import com.music.bitchord.playback.AudioRouting
 import com.music.bitchord.playback.audio.bluetooth.BluetoothTelemetry
+import com.music.bitchord.playback.audio.usb.DirectUsbProbeResult
 
 /**
  * Output transport mechanism selected by the universal best-path engine.
@@ -22,6 +23,7 @@ import com.music.bitchord.playback.audio.bluetooth.BluetoothTelemetry
 enum class TransportType(val label: String) {
     AUDIO_TRACK("AudioTrack"),
     AUDIO_TRACK_DIRECT("AudioTrack (Direct)"),
+    DIRECT_USB("Direct USB"),
 }
 
 /**
@@ -33,6 +35,7 @@ enum class FallbackReason(val label: String) {
     UNSUPPORTED_FORMAT("Unsupported source format"),
     ROUTE_LIMITATION("Route limitation (device profile)"),
     OS_LIMITATION("OS limitation (system audio policy)"),
+    DIRECT_USB_UNAVAILABLE("Direct USB unavailable"),
     DECODER_LIMITATION("Decoder limitation"),
 }
 
@@ -59,6 +62,7 @@ data class DspDescriptor(
 data class RouteDescriptor(
     val kind: AudioRouting.Kind,
     val deviceName: String,
+    val isDirectUsbCapable: Boolean = false,
     val advertisedEncodings: List<Int> = emptyList(),
     val advertisedSampleRates: List<Int> = emptyList(),
     val directSupport: DirectAudioProbe.DirectSupport = DirectAudioProbe.DirectSupport.NONE,
@@ -97,14 +101,10 @@ data class OutputNegotiationResult(
  *
  * Deterministic selection order:
  * 1. Native/direct playback when Android exposes a direct path for the exact format/rate/channel configuration.
- * 2. Highest-quality Android Bluetooth output actually supported by the active route.
- * 3. Highest-quality normal AudioTrack route supported by the active route.
- * 4. Safe fallback.
- *
- * This describes the ordinary sink only. A track on the bit-perfect output
- * ([com.music.bitchord.playback.audio.bitperfect.BitPerfectRoutingSink])
- * never reaches it, and reports through
- * [com.music.bitchord.playback.audio.bitperfect.BitPerfectOutput.status].
+ * 2. Direct USB transport when userspace USB streaming is actually possible and safe.
+ * 3. Highest-quality Android Bluetooth output actually supported by the active route.
+ * 4. Highest-quality normal AudioTrack route supported by the active route.
+ * 5. Safe fallback.
  *
  * Core Rules:
  * - Internal DSP is ALWAYS canonical Float32.
@@ -126,6 +126,7 @@ object OutputNegotiator {
         advertisedEncodings: List<Int>,
         advertisedSampleRates: List<Int>,
         requestedMode: OutputPcmMode,
+        directUsbProbe: DirectUsbProbeResult? = null,
         directSupport: DirectAudioProbe.DirectSupport = DirectAudioProbe.DirectSupport.NONE,
         bluetoothTelemetry: BluetoothTelemetry? = null,
         delegateSupportsFloat: Boolean = true,
@@ -148,6 +149,7 @@ object OutputNegotiator {
         val route = RouteDescriptor(
             kind = routeKind,
             deviceName = deviceName,
+            isDirectUsbCapable = directUsbProbe?.isViable == true,
             advertisedEncodings = advertisedEncodings,
             advertisedSampleRates = advertisedSampleRates,
             directSupport = directSupport,
@@ -163,6 +165,7 @@ object OutputNegotiator {
             advertisedEncodings = advertisedEncodings,
             advertisedSampleRates = advertisedSampleRates,
             requestedMode = requestedMode,
+            directUsbProbe = directUsbProbe,
             directSupport = directSupport,
             bluetoothTelemetry = bluetoothTelemetry,
             delegateSupportsFloat = delegateSupportsFloat,
@@ -187,6 +190,7 @@ object OutputNegotiator {
         advertisedEncodings: List<Int>,
         advertisedSampleRates: List<Int>,
         requestedMode: OutputPcmMode,
+        directUsbProbe: DirectUsbProbeResult?,
         directSupport: DirectAudioProbe.DirectSupport,
         bluetoothTelemetry: BluetoothTelemetry?,
         delegateSupportsFloat: Boolean,
@@ -220,7 +224,22 @@ object OutputNegotiator {
             )
         }
 
-        // 2. Android DIRECT Playback Evaluation (API 33+)
+        // 2. Direct USB Priority: userspace USB streaming if authorized and viable
+        val isDirectUsbViable = routeKind == AudioRouting.Kind.USB && directUsbProbe?.isViable == true
+        if (isDirectUsbViable) {
+            return OutputDescriptor(
+                transport = TransportType.DIRECT_USB,
+                encoding = PcmEncoding.PCM_FLOAT,
+                sampleRateHz = sampleRateHz,
+                channelCount = channelCount,
+                isDirect = true,
+                systemMixerRateHz = null, // Bypasses Android AudioFlinger entirely
+                fallbackReason = FallbackReason.NONE,
+                fallbackDetail = null,
+            )
+        }
+
+        // 3. Android DIRECT Playback Evaluation (API 33+)
         // Priority 3A: Direct Float32
         if (requestedMode == OutputPcmMode.FLOAT_32 && directSupport.supportsFloat && delegateSupportsFloat) {
             return OutputDescriptor(
@@ -287,15 +306,10 @@ object OutputNegotiator {
             )
         }
 
-        // 3. External Route Advertised Capabilities (Normal AudioTrack with framework mixing)
+        // 4. External Route Advertised Capabilities (Normal AudioTrack with framework mixing)
         // Check Float32 advertised:
-        val btCodecBitDepth = bluetoothTelemetry?.takeIf { it.isConnected && it.isAuthoritative }?.bitDepth
-        val canUseFloat = AudioOutputPolicy.shouldUseFloatOutput(
-            requestedMode,
-            routeKind,
-            advertisesFloat,
-            bluetoothCodecBitDepth = btCodecBitDepth,
-        ) && delegateSupportsFloat
+        val canUseFloat = AudioOutputPolicy.shouldUseFloatOutput(requestedMode, routeKind, advertisesFloat) &&
+            delegateSupportsFloat
         if (canUseFloat) {
             return OutputDescriptor(
                 transport = TransportType.AUDIO_TRACK,
@@ -333,18 +347,24 @@ object OutputNegotiator {
             )
         }
 
-        // 4. 16-bit PCM Fallback
+        // 5. 16-bit PCM Fallback
         val (reason, detail) = when {
-            routeKind == AudioRouting.Kind.USB ->
-                Pair(FallbackReason.ROUTE_LIMITATION, "USB device advertises 16-bit PCM only")
+            routeKind == AudioRouting.Kind.USB -> {
+                val r = if (directUsbProbe?.isViable == false) {
+                    FallbackReason.DIRECT_USB_UNAVAILABLE
+                } else {
+                    FallbackReason.ROUTE_LIMITATION
+                }
+                val d = directUsbProbe?.diagnosticReason
+                    ?: "USB device advertises 16-bit PCM only"
+                Pair(r, d)
+            }
             routeKind == AudioRouting.Kind.BLUETOOTH -> {
                 val btSummary = bluetoothTelemetry?.codecName?.let { " ($it)" }.orEmpty()
-                val detail = if ((btCodecBitDepth ?: 0) > 16) {
-                    "Bluetooth route$btSummary runs at $btCodecBitDepth-bit, but float output is unavailable"
-                } else {
-                    "Bluetooth route$btSummary advertises 16-bit PCM only"
-                }
-                Pair(FallbackReason.ROUTE_LIMITATION, detail)
+                Pair(
+                    FallbackReason.ROUTE_LIMITATION,
+                    "Bluetooth route$btSummary advertises 16-bit PCM only",
+                )
             }
             requestedMode == OutputPcmMode.FLOAT_32 -> {
                 Pair(
